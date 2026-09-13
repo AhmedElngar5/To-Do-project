@@ -153,14 +153,14 @@
                         <span class="kanban-col-title">@col.Title</span>
                         <span class="kanban-col-count">@colTasks.Count</span>
                     </div>
-                    <div class="kanban-col-body">
+                    <div class="kanban-col-body" data-status="@((int)col.Status)">
                         @if (colTasks.Count == 0)
                         {
-                            <div style="text-align: center; color: var(--text-tertiary); font-size: var(--text-xs); padding: var(--space-4);">No tasks in this stage</div>
+                            <div class="kanban-empty-hint" style="text-align: center; color: var(--text-tertiary); font-size: var(--text-xs); padding: var(--space-4);">No tasks in this stage (Drop here)</div>
                         }
                         @foreach (var task in colTasks)
                         {
-                            <div class="kanban-card">
+                            <div class="kanban-card" draggable="true" data-task-id="@task.Id">
                                 <div class="kanban-card-title">@task.Title</div>
                                 <div class="kanban-card-meta">
                                     @if (task.DueDate != null)
@@ -388,3 +388,77 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.kanban-card');
+    const cols = document.querySelectorAll('.kanban-col-body');
+
+    cards.forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', card.dataset.taskId);
+            card.classList.add('dragging');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            cols.forEach(c => c.classList.remove('drag-over'));
+        });
+    });
+
+    cols.forEach(col => {
+        col.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            col.classList.add('drag-over');
+        });
+
+        col.addEventListener('dragleave', () => {
+            col.classList.remove('drag-over');
+        });
+
+        col.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            col.classList.remove('drag-over');
+            const taskId = e.dataTransfer.getData('text/plain');
+            const targetStatus = parseInt(col.dataset.status);
+            const card = document.querySelector(`.kanban-card[data-task-id="${taskId}"]`);
+
+            if (card && col !== card.parentElement) {
+                // Remove empty hint if present
+                const emptyHint = col.querySelector('.kanban-empty-hint');
+                if (emptyHint) emptyHint.remove();
+
+                col.appendChild(card);
+
+                // Update column counters
+                document.querySelectorAll('.kanban-col').forEach(kCol => {
+                    const countEl = kCol.querySelector('.kanban-col-count');
+                    const items = kCol.querySelectorAll('.kanban-card');
+                    if (countEl) countEl.textContent = items.length;
+                });
+
+                try {
+                    const res = await fetch(`/api/tasks/${taskId}/status`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: targetStatus })
+                    });
+                    if (res.ok) {
+                        if (window.AhmedOS && window.AhmedOS.Toast) {
+                            window.AhmedOS.Toast.show('Task status updated! 🚀', 'success', 2000);
+                        }
+                    } else {
+                        if (window.AhmedOS && window.AhmedOS.Toast) {
+                            window.AhmedOS.Toast.show('Could not update status.', 'error', 3000);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to move task:', err);
+                }
+            }
+        });
+    });
+});
+</script>
+}

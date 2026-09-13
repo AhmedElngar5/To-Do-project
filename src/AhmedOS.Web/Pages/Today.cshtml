@@ -1,10 +1,12 @@
 @page
 @using AhmedOS.Infrastructure.Data
 @using AhmedOS.Domain.Enums
+@using AhmedOS.Application.Interfaces
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 @inject AhmedOSDbContext Db
 @inject UserManager<ApplicationUser> UserManager
+@inject IAiService AiService
 @model AhmedOS.Web.Pages.TodayModel
 @{
     ViewData["Title"] = "Today";
@@ -35,6 +37,11 @@
     // Habits
     var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).ToListAsync();
     var todayEntries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date.Date == today).ToListAsync();
+
+    // AI & Integrations
+    var briefing = await AiService.GetDailyBriefingAsync(userId ?? "");
+    var settings = await Db.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId);
+    var githubUser = settings?.GithubUsername ?? "AhmedElngar5";
 }
 
 <div class="animate-fade-in">
@@ -49,6 +56,22 @@
                 <div class="progress-bar-fill @(progress >= 80 ? "success" : "")" style="width: @progress%"></div>
             </div>
             <span class="font-semibold">@progress%</span>
+        </div>
+    </div>
+
+    <!-- AI MORNING BRIEFING -->
+    <div class="card mb-4" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.06)); border: 1px solid rgba(99, 102, 241, 0.25);">
+        <div class="card-body" style="display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4);">
+            <span style="font-size: 1.4rem; line-height: 1;">✨</span>
+            <div style="flex: 1;">
+                <div style="font-weight: var(--weight-bold); font-size: var(--text-sm); color: var(--accent); margin-bottom: 2px;">
+                    Ahmed OS AI Morning Briefing
+                </div>
+                <div style="font-size: var(--text-sm); color: var(--text-primary); line-height: 1.5;">
+                    @briefing
+                </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="window.AhmedOS.CommandPalette.open()" title="Open Command Palette (Ctrl+K)">Ctrl+K</button>
         </div>
     </div>
 
@@ -176,6 +199,17 @@
                             <div class="habit-check @(isDone ? "done" : "")" data-habit-id="@habit.Id"></div>
                         </div>
                     }
+                </div>
+            </div>
+
+            <!-- GITHUB DEVELOPER ACTIVITY -->
+            <div class="card mb-4">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="card-title" style="font-size: var(--text-sm);">🐙 GitHub Activity</span>
+                    <a href="https://github.com/@githubUser" target="_blank" rel="noopener" class="text-xs" style="color: var(--accent);">@@@githubUser ↗</a>
+                </div>
+                <div class="card-body" style="text-align: center; padding: var(--space-3); overflow-x: auto;">
+                    <img src="https://ghchart.rshah.org/6366f1/@githubUser" alt="GitHub Contributions" style="max-width: 100%; border-radius: var(--radius-sm); filter: brightness(0.95);" loading="lazy" />
                 </div>
             </div>
 

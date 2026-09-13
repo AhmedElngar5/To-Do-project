@@ -141,17 +141,46 @@
             </div>
         </div>
 
-        <!-- AI STATUS -->
+        <!-- AI & INTEGRATIONS -->
         <div class="card">
-            <div class="card-header"><span class="card-title">🤖 AI Assistant</span></div>
+            <div class="card-header">
+                <span class="card-title">✨ AI Copilot & Cloud Integrations</span>
+            </div>
             <div class="card-body" style="padding: var(--space-4);">
-                <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md);">
-                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 20px;">🤖</div>
-                    <div>
-                        <div style="font-weight: var(--weight-medium);">AI Not Configured</div>
-                        <div class="text-xs text-secondary">Add an API key to enable AI features like daily briefings, task decomposition, and the AI assistant.</div>
+                <form method="post" asp-page-handler="UpdateIntegrations">
+                    @Html.AntiForgeryToken()
+                    <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                        <div class="form-group">
+                            <label class="form-label">
+                                Google Gemini API Key
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="text-xs" style="color: var(--accent); margin-left: 8px;">Get Free Key from Google AI Studio ↗</a>
+                            </label>
+                            <input type="password" name="geminiApiKey" value="@settings.GeminiApiKey" placeholder="AIzaSy..." />
+                            <div class="text-xs text-secondary" style="margin-top: 4px;">
+                                @if (!string.IsNullOrEmpty(settings.GeminiApiKey))
+                                {
+                                    <span style="color: var(--color-success); font-weight: var(--weight-bold);">✨ Gemini 1.5 Flash Enabled</span>
+                                }
+                                else
+                                {
+                                    <span>⚡ Offline Local AI active. Paste key to unlock real generative AI.</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">GitHub Username</label>
+                            <div style="display: flex; gap: var(--space-2);">
+                                <input type="text" name="githubUsername" value="@(settings.GithubUsername ?? "AhmedElngar5")" placeholder="AhmedElngar5" style="flex: 1;" />
+                                <a href="https://github.com/@(settings.GithubUsername ?? "AhmedElngar5")" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center;">View Profile ↗</a>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end;">
+                            <button type="submit" class="btn btn-primary btn-sm">💾 Save Integrations</button>
+                        </div>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
 
@@ -178,6 +207,13 @@
                             <div class="text-xs text-secondary">Export all tasks with priorities and dates</div>
                         </div>
                         <a href="/api/data/export-tasks-csv" class="btn btn-ghost btn-sm" download>📊 Export CSV</a>
+                    </div>
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="text-sm font-medium">Export iCalendar (.ics)</div>
+                            <div class="text-xs text-secondary">Sync schedule, lectures, DEPI, and deadlines with Google or Apple Calendar</div>
+                        </div>
+                        <a href="/api/calendar/export.ics" class="btn btn-secondary btn-sm" download>📅 Export .ics</a>
                     </div>
                 </div>
             </div>

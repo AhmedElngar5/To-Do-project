@@ -45,6 +45,7 @@ public class AhmedOSDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<StudyTopic> StudyTopics => Set<StudyTopic>();
     public DbSet<StudySession> StudySessions => Set<StudySession>();
     public DbSet<StudyResource> StudyResources => Set<StudyResource>();
+    public DbSet<Flashcard> Flashcards => Set<Flashcard>();
 
     // University
     public DbSet<Course> Courses => Set<Course>();

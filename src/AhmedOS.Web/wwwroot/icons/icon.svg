@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="50%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="url(#accentGrad)" stroke-width="3" stroke-opacity="0.4" />
+
+  <!-- Outer Glowing Hexagon -->
+  <polygon points="256,70 416,162 416,350 256,442 96,350 96,162" 
+           fill="none" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
+
+  <!-- Inner Subtle Hexagon -->
+  <polygon points="256,110 380,182 380,330 256,402 132,330 132,182" 
+           fill="none" stroke="url(#glowGrad)" stroke-width="4" stroke-opacity="0.5" stroke-dasharray="8 8" />
+
+  <!-- Stylized Monogram "A" with OS Core Dot -->
+  <path d="M190 350 L256 160 L322 350 M214 290 L298 290" 
+        fill="none" stroke="url(#accentGrad)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Core Pulsing Node -->
+  <circle cx="256" cy="245" r="14" fill="#38bdf8" filter="url(#glow)" />
+</svg>

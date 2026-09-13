@@ -91,8 +91,39 @@
                 if (e.target === this.el) this.close();
             });
 
-            // Filter commands & search API
+            // Arrow key navigation & Enter execution
             if (this.input) {
+                this.input.addEventListener('keydown', (e) => {
+                    const visibleItems = Array.from(this.results?.querySelectorAll('.command-item') || []).filter(item => item.style.display !== 'none');
+                    if (!visibleItems.length) return;
+
+                    const currentIndex = visibleItems.findIndex(item => item.classList.contains('selected'));
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const nextIndex = currentIndex < visibleItems.length - 1 ? currentIndex + 1 : 0;
+                        visibleItems.forEach((item, idx) => item.classList.toggle('selected', idx === nextIndex));
+                        visibleItems[nextIndex]?.scrollIntoView({ block: 'nearest' });
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const prevIndex = currentIndex > 0 ? currentIndex - 1 : visibleItems.length - 1;
+                        visibleItems.forEach((item, idx) => item.classList.toggle('selected', idx === prevIndex));
+                        visibleItems[prevIndex]?.scrollIntoView({ block: 'nearest' });
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const target = currentIndex >= 0 ? visibleItems[currentIndex] : visibleItems[0];
+                        if (target) {
+                            if (target.dataset.url) {
+                                window.location.href = target.dataset.url;
+                            } else if (target.dataset.action) {
+                                this.executeCommand(target.dataset.action);
+                            }
+                            this.close();
+                        }
+                    }
+                });
+
+                // Filter commands & search API
                 this.input.addEventListener('input', () => {
                     const query = this.input.value.trim();
                     this.filterStatic(query);
@@ -183,7 +214,8 @@
         },
         executeCommand(action) {
             const routes = {
-                newTask: '/Tasks?action=create',
+                newTask: () => QuickCapture.show(),
+                quickVoice: () => VoiceCapture.start(),
                 newNote: '/Notes?action=create',
                 newProject: '/Projects?action=create',
                 newGoal: '/Goals?action=create',
@@ -191,17 +223,27 @@
                 startFocus: '/Focus',
                 openToday: '/Today',
                 openCalendar: '/Calendar',
+                openUniversity: '/University',
+                openDEPI: '/DEPI',
+                openCareer: '/Career',
+                openStudy: '/Study',
+                openSkills: '/Skills',
+                openSettings: '/Settings',
                 planDay: '/Planner',
                 reviewDay: '/Reviews',
+                toggleTheme: () => ThemeManager.toggle()
             };
-            if (routes[action]) {
-                window.location.href = routes[action];
+            const target = routes[action];
+            if (typeof target === 'function') {
+                target();
+            } else if (typeof target === 'string') {
+                window.location.href = target;
             }
         }
     };
 
     // ============================================================
-    // QUICK CAPTURE
+    // QUICK CAPTURE & MODAL
     // ============================================================
     const QuickCapture = {
         init() {
@@ -211,7 +253,7 @@
             if (btn) btn.addEventListener('click', () => this.show());
             if (fab) fab.addEventListener('click', () => this.show());
 
-            // Keyboard shortcut
+            // Keyboard shortcut Ctrl+Shift+A
             document.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.shiftKey && e.key === 'A') {
                     e.preventDefault();
@@ -219,9 +261,169 @@
                 }
             });
         },
-        show() {
-            // For now, navigate to inbox with create mode
-            window.location.href = '/Inbox?action=capture';
+        show(initialText = '') {
+            const modal = document.getElementById('globalQuickCaptureModal');
+            const input = document.getElementById('globalQuickCaptureInput');
+            if (modal) {
+                modal.style.display = 'flex';
+                if (input) {
+                    input.value = initialText;
+                    setTimeout(() => input.focus(), 80);
+                }
+            } else {
+                window.location.href = `/Inbox?action=capture&title=${encodeURIComponent(initialText)}`;
+            }
+        },
+        close() {
+            const modal = document.getElementById('globalQuickCaptureModal');
+            if (modal) modal.style.display = 'none';
+        },
+        async submit() {
+            const input = document.getElementById('globalQuickCaptureInput');
+            const statusSelect = document.getElementById('globalQuickCaptureStatus');
+            const prioritySelect = document.getElementById('globalQuickCapturePriority');
+            const btn = document.getElementById('saveQuickCaptureBtn');
+
+            const title = input ? input.value.trim() : '';
+            if (!title) return;
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
+            }
+
+            try {
+                const res = await fetch('/api/tasks/quick-create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: title,
+                        status: statusSelect ? statusSelect.value : 'Inbox',
+                        priority: prioritySelect ? prioritySelect.value : 'Medium'
+                    })
+                });
+
+                if (res.ok) {
+                    if (window.AhmedOS && window.AhmedOS.Toast) {
+                        window.AhmedOS.Toast.show(`Saved: "${title}"`, 'success', 3000);
+                    }
+                    this.close();
+                    if (input) input.value = '';
+
+                    // Reload page if currently on Tasks, Inbox, or Today
+                    const path = window.location.pathname.toLowerCase();
+                    if (path.includes('/tasks') || path.includes('/today') || path.includes('/inbox') || path === '/') {
+                        setTimeout(() => location.reload(), 500);
+                    }
+                } else {
+                    alert('Could not save task. Please try again.');
+                }
+            } catch (err) {
+                console.error('QuickCapture submit error:', err);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Save Task';
+                }
+            }
+        }
+    };
+
+    // ============================================================
+    // VOICE QUICK CAPTURE (Speech-to-Text)
+    // ============================================================
+    const VoiceCapture = {
+        recognition: null,
+        isListening: false,
+
+        init() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const topVoiceBtn = document.getElementById('voiceCaptureBtn');
+            const modalVoiceBtn = document.getElementById('modalVoiceMicBtn');
+
+            if (!SpeechRec) {
+                if (topVoiceBtn) {
+                    topVoiceBtn.title = 'Voice input not supported in this browser';
+                    topVoiceBtn.style.opacity = '0.5';
+                }
+                return;
+            }
+
+            this.recognition = new SpeechRec();
+            this.recognition.continuous = false;
+            this.recognition.interimResults = true;
+            this.recognition.lang = 'ar-EG'; // Primary Egyptian Arabic with English recognition
+
+            this.recognition.onstart = () => {
+                this.isListening = true;
+                this.updateUi(true);
+            };
+
+            this.recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                transcript = transcript.trim();
+                if (transcript) {
+                    QuickCapture.show(transcript);
+                    const input = document.getElementById('globalQuickCaptureInput');
+                    if (input) input.value = transcript;
+                }
+            };
+
+            this.recognition.onerror = (event) => {
+                console.warn('Speech recognition error:', event.error);
+                this.isListening = false;
+                this.updateUi(false);
+                if (window.AhmedOS && window.AhmedOS.Toast) {
+                    window.AhmedOS.Toast.show(`Voice: ${event.error}`, 'error', 3000);
+                }
+            };
+
+            this.recognition.onend = () => {
+                this.isListening = false;
+                this.updateUi(false);
+            };
+
+            if (topVoiceBtn) topVoiceBtn.addEventListener('click', () => this.toggle());
+            if (modalVoiceBtn) modalVoiceBtn.addEventListener('click', () => this.toggle());
+        },
+
+        start() {
+            if (!this.recognition) {
+                if (window.AhmedOS && window.AhmedOS.Toast) {
+                    window.AhmedOS.Toast.show('Speech recognition is not supported in this browser.', 'warning', 4000);
+                }
+                return;
+            }
+            try {
+                QuickCapture.show('');
+                this.recognition.start();
+            } catch (err) {
+                console.warn('Recognition start issue:', err);
+            }
+        },
+
+        stop() {
+            if (this.recognition && this.isListening) {
+                this.recognition.stop();
+            }
+        },
+
+        toggle() {
+            if (this.isListening) this.stop();
+            else this.start();
+        },
+
+        updateUi(active) {
+            const topVoiceBtn = document.getElementById('voiceCaptureBtn');
+            const modalVoiceBtn = document.getElementById('modalVoiceMicBtn');
+            const notice = document.getElementById('voiceStatusNotice');
+
+            if (topVoiceBtn) topVoiceBtn.style.color = active ? 'var(--accent)' : '';
+            if (modalVoiceBtn) modalVoiceBtn.style.color = active ? 'var(--accent)' : '';
+            if (notice) notice.style.display = active ? 'block' : 'none';
         }
     };
 
@@ -586,6 +788,14 @@
         }
     };
 
+    // Expose APIs on window.AhmedOS
+    window.AhmedOS = window.AhmedOS || {};
+    window.AhmedOS.Toast = Toast;
+    window.AhmedOS.QuickCapture = QuickCapture;
+    window.AhmedOS.VoiceCapture = VoiceCapture;
+    window.AhmedOS.CommandPalette = CommandPalette;
+    window.AhmedOS.Theme = ThemeManager;
+
     // ============================================================
     // INITIALIZE
     // ============================================================
@@ -594,6 +804,7 @@
         Sidebar.init();
         CommandPalette.init();
         QuickCapture.init();
+        VoiceCapture.init();
         TaskActions.init();
         Greeting.init();
         Clock.init();

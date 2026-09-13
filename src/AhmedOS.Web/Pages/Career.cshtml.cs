@@ -84,6 +84,10 @@ public class CareerModel : PageModel
             app.Status = status;
             await _db.SaveChangesAsync();
         }
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers.Accept.ToString().Contains("application/json"))
+        {
+            return new JsonResult(new { success = true, status = status.ToString() });
+        }
         return RedirectToPage();
     }
 }

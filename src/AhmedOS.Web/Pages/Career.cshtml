@@ -12,15 +12,20 @@
     var applications = await Db.JobApplications.Where(j => j.UserId == userId).Include(j => j.Company).OrderByDescending(j => j.ApplicationDate).ToListAsync();
     var skills = await Db.Skills.Where(s => s.UserId == userId).OrderBy(s => s.SortOrder).ToListAsync();
 
+    var view = HttpContext.Request.Query["view"].FirstOrDefault() ?? "pipeline";
 }
 
 <div class="animate-fade-in">
     <div class="section-header">
         <div>
-            <h1 class="section-title">💼 Career</h1>
-            <p class="section-subtitle">Job search, applications, networking, and professional development</p>
+            <h1 class="section-title">💼 Career & Job Search</h1>
+            <p class="section-subtitle">Job search, applications pipeline, networking, and interview tracking</p>
         </div>
-        <div>
+        <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg); padding: 2px;">
+                <a href="/Career?view=pipeline" class="btn btn-sm @(view == "pipeline" ? "btn-secondary" : "btn-ghost")" title="Kanban Pipeline">📊 Pipeline</a>
+                <a href="/Career?view=table" class="btn btn-sm @(view == "table" ? "btn-secondary" : "btn-ghost")" title="Table View">📋 Table</a>
+            </div>
             <button class="btn btn-primary btn-sm" onclick="document.getElementById('addApplicationModal').classList.add('active')">
                 ✚ Add Application
             </button>
@@ -29,94 +34,150 @@
 
     <!-- STATS -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
-        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Applications</span><span class="stat-value">@applications.Count</span></div></div>
-        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Active</span><span class="stat-value">@applications.Count(a => a.Status == JobApplicationStatus.Applied || a.Status == JobApplicationStatus.TechnicalInterview || a.Status == JobApplicationStatus.Screening)</span></div></div>
-
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Total Tracked</span><span class="stat-value">@applications.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">In Pipeline</span><span class="stat-value">@applications.Count(a => a.Status != JobApplicationStatus.Offer && a.Status != JobApplicationStatus.Rejected && a.Status != JobApplicationStatus.Withdrawn)</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Interviews</span><span class="stat-value">@applications.Count(a => a.Status == JobApplicationStatus.TechnicalInterview || a.Status == JobApplicationStatus.Screening)</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Offers</span><span class="stat-value" style="color: var(--color-success);">@applications.Count(a => a.Status == JobApplicationStatus.Offer) 🎉</span></div></div>
     </div>
 
-    <div class="widget-grid">
-        <!-- APPLICATIONS -->
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="card-header">
-                <span class="card-title">📋 Job Applications</span>
-            </div>
-            <div class="card-body">
-                @if (applications.Count == 0)
-                {
-                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
-                        <div class="empty-state-icon">💼</div>
-                        <div class="empty-state-title">No applications yet</div>
-                        <div class="empty-state-text">Start tracking your job applications to stay organized.</div>
+    @if (view == "pipeline")
+    {
+        var stages = new[]
+        {
+            (Status: JobApplicationStatus.Saved, Title: "🔖 Saved / Target", Color: "#64748b"),
+            (Status: JobApplicationStatus.Applied, Title: "📨 Applied", Color: "#3b82f6"),
+            (Status: JobApplicationStatus.Screening, Title: "📞 Screening", Color: "#f59e0b"),
+            (Status: JobApplicationStatus.TechnicalInterview, Title: "💻 Tech Interview", Color: "#8b5cf6"),
+            (Status: JobApplicationStatus.Offer, Title: "🎉 Offer", Color: "#10b981"),
+            (Status: JobApplicationStatus.Rejected, Title: "❌ Rejected", Color: "#ef4444")
+        };
+
+        <div class="kanban-board" style="grid-template-columns: repeat(6, minmax(220px, 1fr));">
+            @foreach (var stage in stages)
+            {
+                var stageApps = applications.Where(a => a.Status == stage.Status).ToList();
+                <div class="kanban-col">
+                    <div class="kanban-col-header" style="border-top: 3px solid @stage.Color;">
+                        <span class="kanban-col-title" style="font-size: var(--text-xs);">@stage.Title</span>
+                        <span class="kanban-col-count">@stageApps.Count</span>
                     </div>
-                }
-                else
-                {
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr>
-                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Company</th>
-                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Position</th>
-                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Location</th>
-                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Status</th>
-                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Applied</th>
-                                    <th style="text-align: right; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var app in applications)
-                                {
-                                    var badge = app.Status switch { 
-                                        JobApplicationStatus.Applied => "badge-info", 
-                                        JobApplicationStatus.TechnicalInterview => "badge-primary", 
-                                        JobApplicationStatus.Screening => "badge-warning", 
-                                        JobApplicationStatus.Offer => "badge-success", 
-                                        JobApplicationStatus.Rejected => "badge-danger", 
-                                        _ => "badge-neutral" 
-                                    };
-                                    <tr style="border-top: 1px solid var(--border-secondary);">
-                                        <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">
-                                            @(app.Company?.Name ?? "—")
-                                            @if (!string.IsNullOrEmpty(app.Salary)) { <div class="text-xs text-tertiary">💰 @app.Salary</div> }
-                                        </td>
-                                        <td style="padding: var(--space-2) var(--space-3);">
-                                            <div style="font-weight: var(--weight-medium);">@app.Position</div>
-                                            @if (!string.IsNullOrEmpty(app.Url))
-                                            {
-                                                <a href="@app.Url" target="_blank" rel="noopener" class="text-xs" style="color: var(--color-primary-text);">🔗 Job Posting</a>
-                                            }
-                                        </td>
-                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">
-                                            @(app.Location ?? "Remote")
-                                        </td>
-                                        <td style="padding: var(--space-2) var(--space-3);">
-                                            <span class="badge @badge">@app.Status</span>
-                                        </td>
-                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-tertiary);">
-                                            @(app.ApplicationDate?.ToString("MMM d") ?? "—")
-                                        </td>
-                                        <td style="padding: var(--space-2) var(--space-3); text-align: right;">
-                                            <form method="post" asp-page-handler="UpdateStatus" style="display: inline-flex; gap: 4px;">
-                                                <input type="hidden" name="applicationId" value="@app.Id" />
-                                                <select name="status" onchange="this.form.submit()" style="font-size: 11px; padding: 2px 4px; border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-secondary);">
-                                                    <option value="@JobApplicationStatus.Saved" selected="@(app.Status == JobApplicationStatus.Saved)">Saved</option>
-                                                    <option value="@JobApplicationStatus.Applied" selected="@(app.Status == JobApplicationStatus.Applied)">Applied</option>
-                                                    <option value="@JobApplicationStatus.Screening" selected="@(app.Status == JobApplicationStatus.Screening)">Screening</option>
-                                                    <option value="@JobApplicationStatus.TechnicalInterview" selected="@(app.Status == JobApplicationStatus.TechnicalInterview)">Technical Interview</option>
-                                                    <option value="@JobApplicationStatus.Offer" selected="@(app.Status == JobApplicationStatus.Offer)">Offer</option>
-                                                    <option value="@JobApplicationStatus.Rejected" selected="@(app.Status == JobApplicationStatus.Rejected)">Rejected</option>
-                                                </select>
-                                            </form>
-                                        </td>
+                    <div class="kanban-col-body career-col-body" data-status="@stage.Status">
+                        @if (stageApps.Count == 0)
+                        {
+                            <div class="kanban-empty-hint" style="text-align: center; color: var(--text-tertiary); font-size: var(--text-xs); padding: var(--space-4);">No applications (Drop here)</div>
+                        }
+                        @foreach (var app in stageApps)
+                        {
+                            <div class="kanban-card career-card" draggable="true" data-app-id="@app.Id">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                                    <span style="font-weight: var(--weight-bold); font-size: var(--text-sm); color: var(--text-primary);">@(app.Company?.Name ?? "Company")</span>
+                                    <span class="text-xs text-tertiary">@(app.ApplicationDate?.ToString("MMM d") ?? "")</span>
+                                </div>
+                                <div class="kanban-card-title" style="font-size: var(--text-sm); margin-bottom: 4px;">@app.Position</div>
+                                <div class="kanban-card-meta" style="font-size: var(--text-xs); gap: 6px;">
+                                    <span>📍 @(app.Location ?? "Remote")</span>
+                                    @if (!string.IsNullOrEmpty(app.Salary))
+                                    {
+                                        <span style="color: var(--color-success);">💰 @app.Salary</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(app.Url))
+                                    {
+                                        <a href="@app.Url" target="_blank" rel="noopener" style="color: var(--accent);">🔗 Link</a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="widget-grid">
+            <!-- APPLICATIONS TABLE -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <span class="card-title">📋 Job Applications List</span>
+                </div>
+                <div class="card-body">
+                    @if (applications.Count == 0)
+                    {
+                        <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                            <div class="empty-state-icon">💼</div>
+                            <div class="empty-state-title">No applications yet</div>
+                            <div class="empty-state-text">Start tracking your job applications to stay organized.</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Company</th>
+                                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Position</th>
+                                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Location</th>
+                                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Status</th>
+                                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Applied</th>
+                                        <th style="text-align: right; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Actions</th>
                                     </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
+                                </thead>
+                                <tbody>
+                                    @foreach (var app in applications)
+                                    {
+                                        var badge = app.Status switch { 
+                                            JobApplicationStatus.Applied => "badge-info", 
+                                            JobApplicationStatus.TechnicalInterview => "badge-primary", 
+                                            JobApplicationStatus.Screening => "badge-warning", 
+                                            JobApplicationStatus.Offer => "badge-success", 
+                                            JobApplicationStatus.Rejected => "badge-danger", 
+                                            _ => "badge-neutral" 
+                                        };
+                                        <tr style="border-top: 1px solid var(--border-secondary);">
+                                            <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">
+                                                @(app.Company?.Name ?? "—")
+                                                @if (!string.IsNullOrEmpty(app.Salary)) { <div class="text-xs text-tertiary">💰 @app.Salary</div> }
+                                            </td>
+                                            <td style="padding: var(--space-2) var(--space-3);">
+                                                <div style="font-weight: var(--weight-medium);">@app.Position</div>
+                                                @if (!string.IsNullOrEmpty(app.Url))
+                                                {
+                                                    <a href="@app.Url" target="_blank" rel="noopener" class="text-xs" style="color: var(--color-primary-text);">🔗 Job Posting</a>
+                                                }
+                                            </td>
+                                            <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">
+                                                @(app.Location ?? "Remote")
+                                            </td>
+                                            <td style="padding: var(--space-2) var(--space-3);">
+                                                <span class="badge @badge">@app.Status</span>
+                                            </td>
+                                            <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-tertiary);">
+                                                @(app.ApplicationDate?.ToString("MMM d") ?? "—")
+                                            </td>
+                                            <td style="padding: var(--space-2) var(--space-3); text-align: right;">
+                                                <form method="post" asp-page-handler="UpdateStatus" style="display: inline-flex; gap: 4px;">
+                                                    <input type="hidden" name="applicationId" value="@app.Id" />
+                                                    <select name="status" onchange="this.form.submit()" style="font-size: 11px; padding: 2px 4px; border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-secondary);">
+                                                        <option value="@JobApplicationStatus.Saved" selected="@(app.Status == JobApplicationStatus.Saved)">Saved</option>
+                                                        <option value="@JobApplicationStatus.Applied" selected="@(app.Status == JobApplicationStatus.Applied)">Applied</option>
+                                                        <option value="@JobApplicationStatus.Screening" selected="@(app.Status == JobApplicationStatus.Screening)">Screening</option>
+                                                        <option value="@JobApplicationStatus.TechnicalInterview" selected="@(app.Status == JobApplicationStatus.TechnicalInterview)">Technical Interview</option>
+                                                        <option value="@JobApplicationStatus.Offer" selected="@(app.Status == JobApplicationStatus.Offer)">Offer</option>
+                                                        <option value="@JobApplicationStatus.Rejected" selected="@(app.Status == JobApplicationStatus.Rejected)">Rejected</option>
+                                                    </select>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
-    </div>
+    }
 </div>
 
 <!-- ADD APPLICATION MODAL -->
@@ -192,3 +253,80 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.career-card');
+    const cols = document.querySelectorAll('.career-col-body');
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+    cards.forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', card.dataset.appId);
+            card.classList.add('dragging');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            cols.forEach(c => c.classList.remove('drag-over'));
+        });
+    });
+
+    cols.forEach(col => {
+        col.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            col.classList.add('drag-over');
+        });
+
+        col.addEventListener('dragleave', () => {
+            col.classList.remove('drag-over');
+        });
+
+        col.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            col.classList.remove('drag-over');
+            const appId = e.dataTransfer.getData('text/plain');
+            const targetStatus = col.dataset.status;
+            const card = document.querySelector(`.career-card[data-app-id="${appId}"]`);
+
+            if (card && col !== card.parentElement) {
+                const emptyHint = col.querySelector('.kanban-empty-hint');
+                if (emptyHint) emptyHint.remove();
+
+                col.appendChild(card);
+
+                // Update column counters
+                document.querySelectorAll('.kanban-col').forEach(kCol => {
+                    const countEl = kCol.querySelector('.kanban-col-count');
+                    const items = kCol.querySelectorAll('.career-card');
+                    if (countEl) countEl.textContent = items.length;
+                });
+
+                try {
+                    const formData = new FormData();
+                    formData.append('applicationId', appId);
+                    formData.append('status', targetStatus);
+
+                    const res = await fetch('/Career?handler=UpdateStatus', {
+                        method: 'POST',
+                        headers: {
+                            'RequestVerificationToken': token,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+                    if (res.ok) {
+                        if (window.AhmedOS && window.AhmedOS.Toast) {
+                            window.AhmedOS.Toast.show(`Application moved to ${targetStatus}! 💼`, 'success', 2500);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to move career application:', err);
+                }
+            }
+        });
+    });
+});
+</script>
+}

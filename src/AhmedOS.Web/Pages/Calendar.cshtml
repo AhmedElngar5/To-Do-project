@@ -32,7 +32,10 @@
             <h1 class="section-title">📅 Calendar</h1>
             <p class="section-subtitle">@now.ToString("MMMM yyyy") — Events, deadlines, and schedule</p>
         </div>
-        <div>
+        <div style="display: flex; gap: var(--space-2); align-items: center;">
+            <a href="/api/calendar/export.ics" class="btn btn-secondary btn-sm" download title="Download .ics file to import into Google Calendar or Apple Calendar">
+                📅 Export .ics
+            </a>
             <button class="btn btn-primary btn-sm" onclick="document.getElementById('createEventModal').classList.add('active')">
                 ✚ Add Event
             </button>

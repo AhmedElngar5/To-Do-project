@@ -79,4 +79,23 @@ public class SettingsModel : PageModel
         await _db.SaveChangesAsync();
         return RedirectToPage();
     }
+
+    public async Task<IActionResult> OnPostUpdateIntegrationsAsync(string? githubUsername, string? geminiApiKey)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (userId == null) return RedirectToPage("/Account/Login");
+
+        var settings = await _db.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (settings == null)
+        {
+            settings = new UserSettings { UserId = userId };
+            _db.UserSettings.Add(settings);
+        }
+
+        settings.GithubUsername = string.IsNullOrWhiteSpace(githubUsername) ? "AhmedElngar5" : githubUsername.Trim();
+        settings.GeminiApiKey = string.IsNullOrWhiteSpace(geminiApiKey) ? null : geminiApiKey.Trim();
+
+        await _db.SaveChangesAsync();
+        return RedirectToPage();
+    }
 }

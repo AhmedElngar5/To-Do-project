@@ -15,15 +15,27 @@
     var todayStudy = sessions.Where(s => s.StartTime.Date == today).Sum(s => s.DurationMinutes);
     var weekStudy = sessions.Where(s => s.StartTime.Date >= today.AddDays(-6)).Sum(s => s.DurationMinutes);
     var avgDifficulty = topics.Count > 0 ? topics.Average(t => (int)t.Difficulty) : 0;
+
+    var flashcards = await Db.Flashcards.Where(f => f.UserId == userId).Include(f => f.StudyTopic).OrderBy(f => f.NextReviewDate).ToListAsync();
+    var dueFlashcards = flashcards.Where(f => f.NextReviewDate == null || f.NextReviewDate.Value.Date <= today).ToList();
 }
 
 <div class="animate-fade-in">
     <div class="section-header">
         <div>
-            <h1 class="section-title">📚 Study</h1>
-            <p class="section-subtitle">Track your learning progress across all topics</p>
+            <h1 class="section-title">📚 Study & Flashcards</h1>
+            <p class="section-subtitle">Track learning mastery and spaced repetition retention</p>
         </div>
-        <div style="display: flex; gap: var(--space-2);">
+        <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+            @if (dueFlashcards.Count > 0)
+            {
+                <button class="btn btn-primary btn-sm" onclick="startFlashcardReview()">
+                    🃏 Review (@dueFlashcards.Count Due)
+                </button>
+            }
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('addFlashcardModal').classList.add('active')">
+                ✚ Add Card
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logSessionModal').classList.add('active')">
                 ⏱️ Log Study
             </button>
@@ -37,7 +49,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
         <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Topics</span><span class="stat-value">@topics.Count</span></div></div>
         <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Study Today</span><span class="stat-value">@todayStudy min</span></div></div>
-        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">This Week</span><span class="stat-value">@weekStudy min</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Flashcards</span><span class="stat-value">@flashcards.Count</span><span class="text-xs text-tertiary">(@dueFlashcards.Count due)</span></div></div>
         <div class="card card-compact">
             <div class="card-body stat-widget">
                 <span class="stat-label">Avg Progress</span>
@@ -212,3 +224,200 @@ function openStudyLogModal(topicId, topicName) {
     document.getElementById('logSessionModal').classList.add('active');
 }
 </script>
+
+<!-- FLASHCARDS SECTION -->
+<div class="card" style="margin-top: var(--space-6);">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="card-title">🃏 Spaced Repetition Flashcards (@flashcards.Count total)</span>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('addFlashcardModal').classList.add('active')">✚ Add Flashcard</button>
+    </div>
+    <div class="card-body">
+        @if (flashcards.Count == 0)
+        {
+            <div class="empty-state" style="padding: var(--space-6);">
+                <div class="empty-state-icon">🃏</div>
+                <div class="empty-state-title">No flashcards created yet</div>
+                <div class="empty-state-text">Add flashcards for interview questions, language internals, or algorithms to master them through spaced repetition.</div>
+            </div>
+        }
+        else
+        {
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3);">
+                @foreach (var card in flashcards.Take(12))
+                {
+                    var isDue = card.NextReviewDate == null || card.NextReviewDate.Value.Date <= today;
+                    <div style="background: var(--bg-elevated); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <span class="badge badge-neutral text-xs">@(card.StudyTopic?.Name ?? "General")</span>
+                                <span class="badge @(isDue ? "badge-warning" : "badge-success") text-xs">Box @card.Box @(isDue ? "(Due)" : "")</span>
+                            </div>
+                            <div style="font-weight: var(--weight-medium); font-size: var(--text-sm); margin-bottom: var(--space-2); color: var(--text-primary);">
+                                @card.Front
+                            </div>
+                        </div>
+                        <div style="font-size: var(--text-xs); color: var(--text-tertiary); border-top: 1px dashed var(--border-secondary); padding-top: var(--space-2); margin-top: var(--space-2); display: flex; justify-content: space-between;">
+                            <span>Reviewed @card.ReviewCount times</span>
+                            <span>Next: @(card.NextReviewDate?.ToString("MMM d") ?? "Today")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ADD FLASHCARD MODAL -->
+<div class="modal-overlay" id="addFlashcardModal">
+    <div class="modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 class="modal-title">🃏 New Spaced Repetition Card</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addFlashcardModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddFlashcard">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Study Topic *</label>
+                    <select name="topicId" required>
+                        @foreach (var t in topics)
+                        {
+                            <option value="@t.Id">@t.Icon @t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Question / Concept (Front) *</label>
+                    <textarea name="front" rows="2" required placeholder="e.g. What is the difference between Task.Run and Task.Factory.StartNew?" autofocus></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Answer / Explanation (Back) *</label>
+                    <textarea name="back" rows="4" required placeholder="e.g. Task.Run is shorthand for Task.Factory.StartNew with default TaskScheduler.Default and TaskCreationOptions.DenyChildAttach..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addFlashcardModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Flashcard</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- FLASHCARD REVIEW MODAL -->
+<div class="modal-overlay" id="reviewFlashcardModal">
+    <div class="modal" style="max-width: 560px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="reviewProgressTitle">🃏 Spaced Repetition Review</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('reviewFlashcardModal').classList.remove('active')">✕</button>
+        </div>
+        <div class="modal-body" style="padding: var(--space-4);">
+            <div class="flashcard-container" onclick="flipFlashcard()">
+                <div class="flashcard-inner" id="reviewCardInner">
+                    <div class="flashcard-front">
+                        <div id="reviewCardTopic" class="badge badge-primary text-xs" style="margin-bottom: var(--space-3);">Topic</div>
+                        <div id="reviewCardFront" style="font-size: var(--text-lg); font-weight: var(--weight-bold); line-height: 1.4;">Question</div>
+                        <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: var(--space-4);">👆 Click anywhere to reveal answer</div>
+                    </div>
+                    <div class="flashcard-back">
+                        <div class="badge badge-success text-xs" style="margin-bottom: var(--space-3);">Answer</div>
+                        <div id="reviewCardBack" style="font-size: var(--text-md); line-height: 1.6; text-align: left; white-space: pre-wrap;">Answer text</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reviewRatingControls" style="display: none; margin-top: var(--space-4); justify-content: center; gap: var(--space-3);">
+                <button type="button" class="btn btn-danger btn-sm" onclick="rateFlashcard(1)">🔴 Hard (Box 1)</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="rateFlashcard(2)">🟡 Good (Box +1)</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="rateFlashcard(3)">🟢 Easy (Box +1)</button>
+            </div>
+
+            <div id="reviewDoneScreen" style="display: none; text-align: center; padding: var(--space-6);">
+                <div style="font-size: 3rem;">🎉</div>
+                <h3 style="margin: var(--space-2) 0;">All caught up for today!</h3>
+                <p class="text-sm text-secondary">Great work retaining your knowledge with spaced repetition.</p>
+                <button type="button" class="btn btn-primary mt-4" onclick="document.getElementById('reviewFlashcardModal').classList.remove('active'); location.reload();">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const reviewQueue = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(dueFlashcards.Select(f => new {
+    id = f.Id,
+    front = f.Front,
+    back = f.Back,
+    topic = f.StudyTopic?.Name ?? "General",
+    box = f.Box
+})));
+
+let currentReviewIndex = 0;
+
+function startFlashcardReview() {
+    if (!reviewQueue.length) {
+        if (window.AhmedOS && window.AhmedOS.Toast) {
+            window.AhmedOS.Toast.show('No flashcards due right now! Great job 🎉', 'success', 3000);
+        }
+        return;
+    }
+    currentReviewIndex = 0;
+    renderCurrentCard();
+    document.getElementById('reviewFlashcardModal').classList.add('active');
+}
+
+function renderCurrentCard() {
+    const inner = document.getElementById('reviewCardInner');
+    inner.classList.remove('flipped');
+    document.getElementById('reviewRatingControls').style.display = 'none';
+    document.getElementById('reviewDoneScreen').style.display = 'none';
+    document.querySelector('.flashcard-container').style.display = 'block';
+
+    if (currentReviewIndex >= reviewQueue.length) {
+        document.querySelector('.flashcard-container').style.display = 'none';
+        document.getElementById('reviewRatingControls').style.display = 'none';
+        document.getElementById('reviewDoneScreen').style.display = 'block';
+        document.getElementById('reviewProgressTitle').textContent = 'Review Complete! 🎉';
+        return;
+    }
+
+    const card = reviewQueue[currentReviewIndex];
+    document.getElementById('reviewProgressTitle').textContent = `Review (${currentReviewIndex + 1}/${reviewQueue.length}) — Box ${card.box}`;
+    document.getElementById('reviewCardTopic').textContent = card.topic;
+    document.getElementById('reviewCardFront').textContent = card.front;
+    document.getElementById('reviewCardBack').textContent = card.back;
+}
+
+function flipFlashcard() {
+    const inner = document.getElementById('reviewCardInner');
+    inner.classList.toggle('flipped');
+    if (inner.classList.contains('flipped')) {
+        document.getElementById('reviewRatingControls').style.display = 'flex';
+    }
+}
+
+async function rateFlashcard(rating) {
+    if (currentReviewIndex >= reviewQueue.length) return;
+    const card = reviewQueue[currentReviewIndex];
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+    const formData = new FormData();
+    formData.append('cardId', card.id);
+    formData.append('rating', rating);
+
+    try {
+        fetch('/Study?handler=ReviewFlashcard', {
+            method: 'POST',
+            headers: {
+                'RequestVerificationToken': token,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        }).catch(err => console.error(err));
+    } catch (err) {
+        console.error(err);
+    }
+
+    currentReviewIndex++;
+    renderCurrentCard();
+}
+</script>
+

@@ -64,6 +64,10 @@ public class UserSettings : BaseEntity
 
     // Dashboard layout (JSON)
     public string? DashboardLayout { get; set; }
+
+    // Integrations
+    public string? GithubUsername { get; set; } = "AhmedElngar5";
+    public string? GeminiApiKey { get; set; }
 }
 
 /// <summary>

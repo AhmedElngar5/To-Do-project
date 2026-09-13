@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — Ahmed OS</title>
     <meta name="description" content="Ahmed OS — Personal Operating System for life, study, career & productivity" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0b0f19" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
     <link rel="stylesheet" href="~/css/site.css" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' font-family='sans-serif' font-size='55' font-weight='bold' fill='white' text-anchor='middle'>A</text></svg>" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
 </head>
 <body>
     @if (User.Identity?.IsAuthenticated == true)
@@ -127,6 +132,9 @@
                         </button>
                     </div>
                     <div class="topbar-right">
+                        <button class="topbar-btn" id="voiceCaptureBtn" aria-label="Voice capture" title="Voice Quick Capture (Arabic / English)">
+                            🎙️
+                        </button>
                         <button class="topbar-btn" id="quickCaptureBtn" aria-label="Quick capture" title="Quick capture (Ctrl+Shift+A)">
                             ✚
                         </button>
@@ -190,6 +198,7 @@
                     <input type="text" class="command-palette-input" id="commandInput" placeholder="Type a command or search..." autocomplete="off" />
                     <div class="command-results" id="commandResults">
                         <div class="command-item" data-action="newTask"><span class="command-item-icon">✚</span> New Task <span class="command-item-shortcut">N</span></div>
+                        <div class="command-item" data-action="quickVoice"><span class="command-item-icon">🎙️</span> Voice Quick Capture</div>
                         <div class="command-item" data-action="newNote"><span class="command-item-icon">📝</span> New Note</div>
                         <div class="command-item" data-action="newProject"><span class="command-item-icon">🚀</span> New Project</div>
                         <div class="command-item" data-action="newGoal"><span class="command-item-icon">🎯</span> New Goal</div>
@@ -197,9 +206,61 @@
                         <div class="command-item" data-action="startFocus"><span class="command-item-icon">⏱️</span> Start Focus Session</div>
                         <div class="command-item" data-action="openToday"><span class="command-item-icon">📌</span> Open Today</div>
                         <div class="command-item" data-action="openCalendar"><span class="command-item-icon">📅</span> Open Calendar</div>
-                        <div class="command-item" data-action="planDay"><span class="command-item-icon">📋</span> Plan My Day</div>
-                        <div class="command-item" data-action="reviewDay"><span class="command-item-icon">🔍</span> Review Day</div>
+                        <div class="command-item" data-action="openUniversity"><span class="command-item-icon">🎓</span> University Courses & GPA</div>
+                        <div class="command-item" data-action="openDEPI"><span class="command-item-icon">🇪🇬</span> DEPI Track & Sessions</div>
+                        <div class="command-item" data-action="openCareer"><span class="command-item-icon">💼</span> Career & Applications</div>
+                        <div class="command-item" data-action="openStudy"><span class="command-item-icon">📚</span> Study & Learning</div>
+                        <div class="command-item" data-action="openSkills"><span class="command-item-icon">⚡</span> Skills Matrix</div>
+                        <div class="command-item" data-action="openSettings"><span class="command-item-icon">⚙️</span> Settings & Preferences</div>
+                        <div class="command-item" data-action="toggleTheme"><span class="command-item-icon">🌓</span> Toggle Dark / Light Theme</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- GLOBAL QUICK CAPTURE MODAL -->
+            <div class="modal-backdrop" id="globalQuickCaptureModal" style="display: none;" onclick="if(event.target === this) this.style.display='none'">
+                <div class="modal" style="max-width: 480px;">
+                    <div class="modal-header">
+                        <h2 class="modal-title">⚡ Quick Capture</h2>
+                        <button class="modal-close" onclick="document.getElementById('globalQuickCaptureModal').style.display='none'">✕</button>
+                    </div>
+                    <form id="globalQuickCaptureForm" onsubmit="event.preventDefault(); window.AhmedOS.QuickCapture.submit();">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label class="form-label">Task or Note *</label>
+                                <div style="position: relative; display: flex; align-items: center;">
+                                    <input type="text" id="globalQuickCaptureInput" required placeholder="Type task or click mic to speak..." autofocus style="padding-right: 42px;" />
+                                    <button type="button" id="modalVoiceMicBtn" style="position: absolute; right: 10px; background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 2px;" title="Dictate voice (Arabic or English)">🎙️</button>
+                                </div>
+                                <div id="voiceStatusNotice" style="display: none; font-size: var(--text-xs); color: var(--accent); margin-top: 4px;">
+                                    🎙️ Listening... Speak in Arabic or English
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3);">
+                                <div class="form-group">
+                                    <label class="form-label">Destination</label>
+                                    <select id="globalQuickCaptureStatus">
+                                        <option value="Inbox">Inbox (To Triage)</option>
+                                        <option value="Planned">Planned</option>
+                                        <option value="InProgress">In Progress</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Priority</label>
+                                    <select id="globalQuickCapturePriority">
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High 🔥</option>
+                                        <option value="Critical">Critical ⚡</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('globalQuickCaptureModal').style.display='none'">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="saveQuickCaptureBtn">Save Task</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -236,6 +297,15 @@
     }
 
     <script src="~/js/site.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(reg => console.log('AhmedOS Service Worker registered with scope:', reg.scope))
+                    .catch(err => console.log('AhmedOS Service Worker registration failed:', err));
+            });
+        }
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
