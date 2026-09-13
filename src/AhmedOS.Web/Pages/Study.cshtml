@@ -23,6 +23,14 @@
             <h1 class="section-title">📚 Study</h1>
             <p class="section-subtitle">Track your learning progress across all topics</p>
         </div>
+        <div style="display: flex; gap: var(--space-2);">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logSessionModal').classList.add('active')">
+                ⏱️ Log Study
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('addTopicModal').classList.add('active')">
+                ✚ Add Topic
+            </button>
+        </div>
     </div>
 
     <!-- STATS -->
@@ -74,7 +82,12 @@
                         </div>
                         <div class="flex items-center justify-between mt-2">
                             <span class="text-xs text-tertiary">Difficulty: @topic.Difficulty</span>
-                            <span class="text-xs text-secondary">@topic.Progress%</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-secondary font-medium">@topic.Progress%</span>
+                                <button type="button" class="btn btn-ghost btn-xs" onclick="openStudyLogModal(@topic.Id, '@topic.Name')" style="font-size: 11px;">
+                                    ⏱️ Log Session
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -82,3 +95,120 @@
         </div>
     </div>
 </div>
+
+<!-- ADD TOPIC MODAL -->
+<div class="modal-overlay" id="addTopicModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">📚 Add Study Topic</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addTopicModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddTopic">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Topic Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. ASP.NET Core Middleware, Docker & Containers" autofocus />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description / Scope</label>
+                    <textarea name="description" rows="2" placeholder="Key concepts, books or courses covered..."></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Difficulty</label>
+                        <select name="difficulty">
+                            <option value="@Difficulty.Easy">Easy</option>
+                            <option value="@Difficulty.Medium" selected>Medium</option>
+                            <option value="@Difficulty.Hard">Hard</option>
+                            <option value="@Difficulty.Advanced">Advanced 🔥</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Initial Confidence</label>
+                        <select name="confidence">
+                            <option value="@ConfidenceLevel.None">None</option>
+                            <option value="@ConfidenceLevel.Low" selected>Low</option>
+                            <option value="@ConfidenceLevel.Medium">Medium</option>
+                            <option value="@ConfidenceLevel.High">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select name="status">
+                            <option value="@StudyStatus.Learning" selected>Learning</option>
+                            <option value="@StudyStatus.Practicing">Practicing</option>
+                            <option value="@StudyStatus.NotStarted">Not Started</option>
+                            <option value="@StudyStatus.Mastered">Mastered</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Icon (Emoji)</label>
+                        <input type="text" name="icon" value="📗" placeholder="📗" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addTopicModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Topic</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- LOG STUDY SESSION MODAL -->
+<div class="modal-overlay" id="logSessionModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="logSessionModalTitle">⏱️ Log Study Session</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('logSessionModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="LogSession">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Study Topic *</label>
+                    <select name="topicId" id="studyTopicSelect" required>
+                        @foreach (var t in topics)
+                        {
+                            <option value="@t.Id">@t.Icon @t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Duration (minutes) *</label>
+                        <input type="number" name="durationMinutes" required value="45" min="5" step="5" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confidence After Session</label>
+                        <select name="confidenceAfter">
+                            <option value="@ConfidenceLevel.Medium">Medium 🙂</option>
+                            <option value="@ConfidenceLevel.High">High 🚀</option>
+                            <option value="@ConfidenceLevel.Low">Low 😕</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes / What was learned</label>
+                    <textarea name="notes" rows="2" placeholder="Summary, code snippets, gotchas..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('logSessionModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Log Session</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openStudyLogModal(topicId, topicName) {
+    const select = document.getElementById('studyTopicSelect');
+    if (select) select.value = topicId;
+    document.getElementById('logSessionModalTitle').textContent = '⏱️ Log Study — ' + topicName;
+    document.getElementById('logSessionModal').classList.add('active');
+}
+</script>

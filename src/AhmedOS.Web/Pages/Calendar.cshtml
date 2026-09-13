@@ -22,6 +22,7 @@
     var firstDayOfMonth = (int)startOfMonth.DayOfWeek;
     var daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
     var eventsByDay = thisMonthEvents.GroupBy(e => e.StartTime.Day).ToDictionary(g => g.Key, g => g.ToList());
+    var courses = await Db.Courses.Where(c => c.UserId == userId).OrderBy(c => c.Name).ToListAsync();
     var tasksByDay = tasksDue.Where(t => t.DueDate!.Value.Month == now.Month && t.DueDate!.Value.Year == now.Year).GroupBy(t => t.DueDate!.Value.Day).ToDictionary(g => g.Key, g => g.Count());
 }
 
@@ -30,6 +31,11 @@
         <div>
             <h1 class="section-title">📅 Calendar</h1>
             <p class="section-subtitle">@now.ToString("MMMM yyyy") — Events, deadlines, and schedule</p>
+        </div>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('createEventModal').classList.add('active')">
+                ✚ Add Event
+            </button>
         </div>
     </div>
 
@@ -110,10 +116,19 @@
                         var typeClass = ev.EventType switch { CalendarEventType.Exam => "badge-danger", CalendarEventType.Assignment => "badge-warning", CalendarEventType.Class => "badge-info", _ => "badge-neutral" };
                         <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: var(--text-sm);">@typeIcon @ev.Title</span>
-                                <span class="badge @typeClass" style="font-size: 10px;">@ev.EventType</span>
+                                <span style="font-size: var(--text-sm); font-weight: var(--weight-medium);">@typeIcon @ev.Title</span>
+                                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                    <span class="badge @typeClass" style="font-size: 10px;">@ev.EventType</span>
+                                    <form method="post" asp-page-handler="DeleteEvent" style="margin: 0;">
+                                        <input type="hidden" name="eventId" value="@ev.Id" />
+                                        <button type="submit" class="btn btn-ghost btn-xs" style="color: var(--color-danger); padding: 2px 4px;" title="Delete event">✕</button>
+                                    </form>
+                                </div>
                             </div>
-                            <div class="text-xs text-tertiary" style="margin-top: 2px;">@ev.StartTime.ToString("ddd, MMM d · h:mm tt")</div>
+                            <div class="text-xs text-tertiary" style="margin-top: 2px;">
+                                @ev.StartTime.ToString("ddd, MMM d · h:mm tt")
+                                @if (!string.IsNullOrEmpty(ev.Location)) { <span>· 📍 @ev.Location</span> }
+                            </div>
                         </div>
                     }
                 </div>
@@ -142,5 +157,70 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- CREATE EVENT MODAL -->
+<div class="modal-overlay" id="createEventModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">📅 Add Calendar Event</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('createEventModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateEvent">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Event Title *</label>
+                    <input type="text" name="title" required placeholder="e.g. Algorithms Lecture, Wasel Team Sync" autofocus />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Event Type</label>
+                        <select name="eventType">
+                            <option value="@CalendarEventType.Class">📚 Class</option>
+                            <option value="@CalendarEventType.Exam">📝 Exam</option>
+                            <option value="@CalendarEventType.Assignment">📄 Assignment</option>
+                            <option value="@CalendarEventType.Meeting">👥 Meeting</option>
+                            <option value="@CalendarEventType.StudySession">📖 Study Session</option>
+                            <option value="@CalendarEventType.Interview">💼 Interview</option>
+                            <option value="@CalendarEventType.Personal">🌟 Personal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Related Course (Optional)</label>
+                        <select name="courseId">
+                            <option value="">None</option>
+                            @foreach (var c in courses)
+                            {
+                                <option value="@c.Id">@c.Code - @c.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Start Time *</label>
+                        <input type="datetime-local" name="startTime" required value="@now.ToString("yyyy-MM-ddTHH:mm")" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time</label>
+                        <input type="datetime-local" name="endTime" value="@now.AddHours(1).ToString("yyyy-MM-ddTHH:mm")" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Location / Platform</label>
+                    <input type="text" name="location" placeholder="e.g. Hall 4, Microsoft Teams, Google Meet" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes / Description</label>
+                    <textarea name="description" rows="2" placeholder="Agenda or details..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createEventModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Event</button>
+            </div>
+        </form>
     </div>
 </div>

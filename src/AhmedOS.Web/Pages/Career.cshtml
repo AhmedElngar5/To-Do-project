@@ -20,6 +20,11 @@
             <h1 class="section-title">💼 Career</h1>
             <p class="section-subtitle">Job search, applications, networking, and professional development</p>
         </div>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('addApplicationModal').classList.add('active')">
+                ✚ Add Application
+            </button>
+        </div>
     </div>
 
     <!-- STATS -->
@@ -52,19 +57,57 @@
                                 <tr>
                                     <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Company</th>
                                     <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Position</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Location</th>
                                     <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Status</th>
                                     <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Applied</th>
+                                    <th style="text-align: right; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var app in applications)
                                 {
-                                    var badge = app.Status switch { JobApplicationStatus.Applied => "badge-info", JobApplicationStatus.TechnicalInterview => "badge-primary", JobApplicationStatus.Screening => "badge-warning", JobApplicationStatus.Offer => "badge-success", JobApplicationStatus.Rejected => "badge-danger", _ => "badge-neutral" };
+                                    var badge = app.Status switch { 
+                                        JobApplicationStatus.Applied => "badge-info", 
+                                        JobApplicationStatus.TechnicalInterview => "badge-primary", 
+                                        JobApplicationStatus.Screening => "badge-warning", 
+                                        JobApplicationStatus.Offer => "badge-success", 
+                                        JobApplicationStatus.Rejected => "badge-danger", 
+                                        _ => "badge-neutral" 
+                                    };
                                     <tr style="border-top: 1px solid var(--border-secondary);">
-                                        <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">@(app.Company?.Name ?? "—")</td>
-                                        <td style="padding: var(--space-2) var(--space-3); color: var(--text-secondary);">@app.Position</td>
-                                        <td style="padding: var(--space-2) var(--space-3);"><span class="badge @badge">@app.Status</span></td>
-                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-tertiary);">@(app.ApplicationDate?.ToString("MMM d") ?? "—")</td>
+                                        <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">
+                                            @(app.Company?.Name ?? "—")
+                                            @if (!string.IsNullOrEmpty(app.Salary)) { <div class="text-xs text-tertiary">💰 @app.Salary</div> }
+                                        </td>
+                                        <td style="padding: var(--space-2) var(--space-3);">
+                                            <div style="font-weight: var(--weight-medium);">@app.Position</div>
+                                            @if (!string.IsNullOrEmpty(app.Url))
+                                            {
+                                                <a href="@app.Url" target="_blank" rel="noopener" class="text-xs" style="color: var(--color-primary-text);">🔗 Job Posting</a>
+                                            }
+                                        </td>
+                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">
+                                            @(app.Location ?? "Remote")
+                                        </td>
+                                        <td style="padding: var(--space-2) var(--space-3);">
+                                            <span class="badge @badge">@app.Status</span>
+                                        </td>
+                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-tertiary);">
+                                            @(app.ApplicationDate?.ToString("MMM d") ?? "—")
+                                        </td>
+                                        <td style="padding: var(--space-2) var(--space-3); text-align: right;">
+                                            <form method="post" asp-page-handler="UpdateStatus" style="display: inline-flex; gap: 4px;">
+                                                <input type="hidden" name="applicationId" value="@app.Id" />
+                                                <select name="status" onchange="this.form.submit()" style="font-size: 11px; padding: 2px 4px; border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-secondary);">
+                                                    <option value="@JobApplicationStatus.Saved" selected="@(app.Status == JobApplicationStatus.Saved)">Saved</option>
+                                                    <option value="@JobApplicationStatus.Applied" selected="@(app.Status == JobApplicationStatus.Applied)">Applied</option>
+                                                    <option value="@JobApplicationStatus.Screening" selected="@(app.Status == JobApplicationStatus.Screening)">Screening</option>
+                                                    <option value="@JobApplicationStatus.TechnicalInterview" selected="@(app.Status == JobApplicationStatus.TechnicalInterview)">Technical Interview</option>
+                                                    <option value="@JobApplicationStatus.Offer" selected="@(app.Status == JobApplicationStatus.Offer)">Offer</option>
+                                                    <option value="@JobApplicationStatus.Rejected" selected="@(app.Status == JobApplicationStatus.Rejected)">Rejected</option>
+                                                </select>
+                                            </form>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -73,7 +116,79 @@
                 }
             </div>
         </div>
+    </div>
+</div>
 
-
+<!-- ADD APPLICATION MODAL -->
+<div class="modal-overlay" id="addApplicationModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">💼 Track Job Application</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addApplicationModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddApplication">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Company Name *</label>
+                        <input type="text" name="companyName" required placeholder="e.g. Microsoft, Vodafone, Si-Vision" autofocus />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Position / Role *</label>
+                        <input type="text" name="position" required placeholder="e.g. Junior .NET Developer, Backend Engineer" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Employment Type</label>
+                        <select name="employmentType">
+                            <option value="@EmploymentType.FullTime">Full Time</option>
+                            <option value="@EmploymentType.PartTime">Part Time</option>
+                            <option value="@EmploymentType.Internship">Internship</option>
+                            <option value="@EmploymentType.Contract">Contract / Freelance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select name="status">
+                            <option value="@JobApplicationStatus.Applied" selected>Applied</option>
+                            <option value="@JobApplicationStatus.Saved">Saved (Draft)</option>
+                            <option value="@JobApplicationStatus.Screening">Screening</option>
+                            <option value="@JobApplicationStatus.TechnicalInterview">Technical Interview</option>
+                            <option value="@JobApplicationStatus.Offer">Offer 🎉</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Location</label>
+                        <input type="text" name="location" placeholder="e.g. Cairo, Egypt (Hybrid) or Remote" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary (Expected/Offered)</label>
+                        <input type="text" name="salary" placeholder="e.g. 15,000 - 20,000 EGP" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Job Posting URL</label>
+                        <input type="url" name="url" placeholder="https://linkedin.com/jobs/..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Source</label>
+                        <input type="text" name="source" value="LinkedIn" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes & Requirements</label>
+                    <textarea name="notes" rows="2" placeholder="Tech stack, recruiter contact, interview prep notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addApplicationModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Application</button>
+            </div>
+        </form>
     </div>
 </div>

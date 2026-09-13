@@ -27,7 +27,12 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: var(--space-4);">
         <!-- PROFILE -->
         <div class="card">
-            <div class="card-header"><span class="card-title">👤 Profile</span></div>
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="card-title">👤 Profile</span>
+                <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('editProfileModal').classList.add('active')">
+                    ✏️ Edit Profile
+                </button>
+            </div>
             <div class="card-body" style="padding: var(--space-4);">
                 <div style="display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-4);">
                     <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-info)); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: var(--weight-bold); color: white;">
@@ -54,7 +59,12 @@
 
         <!-- WORK PREFERENCES -->
         <div class="card">
-            <div class="card-header"><span class="card-title">🕐 Work Preferences</span></div>
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="card-title">🕐 Work Preferences</span>
+                <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('editPreferencesModal').classList.add('active')">
+                    ✏️ Edit Preferences
+                </button>
+            </div>
             <div class="card-body" style="padding: var(--space-4);">
                 <div style="display: flex; flex-direction: column; gap: var(--space-3);">
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
@@ -172,5 +182,116 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal-overlay" id="editProfileModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">👤 Edit Profile</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('editProfileModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="UpdateProfile">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Full Name *</label>
+                    <input type="text" name="fullName" required value="@(user?.FullName ?? "Ahmed Hany Kamal El Nagar")" autofocus />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address (Read Only)</label>
+                    <input type="text" value="@(user?.Email ?? "")" disabled style="opacity: 0.7;" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('editProfileModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT PREFERENCES MODAL -->
+<div class="modal-overlay" id="editPreferencesModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 class="modal-title">⚙️ Edit Work Preferences</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('editPreferencesModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="UpdatePreferences">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Work Start Time</label>
+                        <input type="time" name="workStartTime" value="@(settings.WorkStartTime ?? "09:00")" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Work End Time</label>
+                        <input type="time" name="workEndTime" value="@(settings.WorkEndTime ?? "17:00")" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Max Deep Work (hours/day)</label>
+                        <input type="number" name="maxDeepWorkHours" value="@settings.MaxDeepWorkHours" min="1" max="12" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Study (hours/day)</label>
+                        <input type="number" name="maxStudyHours" value="@settings.MaxStudyHours" min="1" max="12" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Default Task Duration (min)</label>
+                        <input type="number" name="defaultTaskDurationMinutes" value="@settings.DefaultTaskDurationMinutes" min="5" step="5" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Break Duration (min)</label>
+                        <input type="number" name="defaultBreakMinutes" value="@settings.DefaultBreakMinutes" min="5" step="5" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Preferred Deep Work Time</label>
+                        <select name="preferredDeepWorkTime">
+                            <option value="@TimeOfDay.Morning" selected="@(settings.PreferredDeepWorkTime == TimeOfDay.Morning)">Morning 🌅</option>
+                            <option value="@TimeOfDay.Afternoon" selected="@(settings.PreferredDeepWorkTime == TimeOfDay.Afternoon)">Afternoon ☀️</option>
+                            <option value="@TimeOfDay.Evening" selected="@(settings.PreferredDeepWorkTime == TimeOfDay.Evening)">Evening 🌇</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Preferred Study Time</label>
+                        <select name="preferredStudyTime">
+                            <option value="@TimeOfDay.Morning" selected="@(settings.PreferredStudyTime == TimeOfDay.Morning)">Morning 🌅</option>
+                            <option value="@TimeOfDay.Afternoon" selected="@(settings.PreferredStudyTime == TimeOfDay.Afternoon)">Afternoon ☀️</option>
+                            <option value="@TimeOfDay.Evening" selected="@(settings.PreferredStudyTime == TimeOfDay.Evening)">Evening 🌇</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Theme</label>
+                        <select name="theme">
+                            <option value="dark" selected="@(settings.Theme == "dark")">Dark Theme</option>
+                            <option value="light" selected="@(settings.Theme == "light")">Light Theme</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Timezone</label>
+                        <input type="text" name="timezone" value="@settings.Timezone" />
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2);">
+                    <input type="checkbox" name="notificationsEnabled" value="true" id="notificationsCheck" checked="@settings.NotificationsEnabled" style="width: auto;" />
+                    <label for="notificationsCheck" class="form-label" style="margin-bottom: 0;">Enable Notifications</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('editPreferencesModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Preferences</button>
+            </div>
+        </form>
     </div>
 </div>

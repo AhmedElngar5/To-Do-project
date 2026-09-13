@@ -28,6 +28,11 @@
             <h1 class="section-title">🔍 Reviews</h1>
             <p class="section-subtitle">Reflect on your progress — daily and weekly reviews</p>
         </div>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('reviewModal').classList.add('active')">
+                ✍️ @(todayReview == null ? "Write Today's Review" : "Edit Today's Review")
+            </button>
+        </div>
     </div>
 
     <!-- WEEKLY SNAPSHOT -->
@@ -42,8 +47,11 @@
     <div class="widget-grid">
         <!-- TODAY'S REVIEW -->
         <div class="card" style="grid-column: 1 / -1;">
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="card-title">📝 Today's Review — @today.ToString("dddd, MMMM d")</span>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('reviewModal').classList.add('active')">
+                    @(todayReview == null ? "✍️ Start Review" : "✏️ Edit")
+                </button>
             </div>
             <div class="card-body" style="padding: var(--space-4);">
                 @if (todayReview == null)
@@ -52,6 +60,11 @@
                         <div class="empty-state-icon">📝</div>
                         <div class="empty-state-title">No review for today yet</div>
                         <div class="empty-state-text">Take a moment at the end of the day to reflect on what you accomplished, what challenged you, and what you'll do tomorrow.</div>
+                        <div style="margin-top: var(--space-4);">
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('reviewModal').classList.add('active')">
+                                ✍️ Write Today's Review
+                            </button>
+                        </div>
                     </div>
                 }
                 else
@@ -138,5 +151,62 @@
                 }
             </div>
         </div>
+    </div>
+</div>
+
+<!-- REVIEW MODAL -->
+<div class="modal-overlay" id="reviewModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 class="modal-title">📝 @(todayReview == null ? "Daily Review" : "Edit Daily Review") — @today.ToString("MMM d")</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('reviewModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="SaveReview">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Mood Rating (1-5)</label>
+                        <select name="moodRating">
+                            <option value="5" selected="@(todayReview?.MoodRating == 5)">😊 Great (5/5)</option>
+                            <option value="4" selected="@(todayReview?.MoodRating == 4)">🙂 Good (4/5)</option>
+                            <option value="3" selected="@(todayReview?.MoodRating == 3 || todayReview?.MoodRating == null)">😐 Neutral (3/5)</option>
+                            <option value="2" selected="@(todayReview?.MoodRating == 2)">😟 Low (2/5)</option>
+                            <option value="1" selected="@(todayReview?.MoodRating == 1)">😢 Rough (1/5)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Productivity Rating (1-5)</label>
+                        <select name="productivityRating">
+                            <option value="5" selected="@(todayReview?.ProductivityRating == 5)">🔥 Extremely Productive (5/5)</option>
+                            <option value="4" selected="@(todayReview?.ProductivityRating == 4 || todayReview?.ProductivityRating == null)">⚡ Productive (4/5)</option>
+                            <option value="3" selected="@(todayReview?.ProductivityRating == 3)">⚖️ Average (3/5)</option>
+                            <option value="2" selected="@(todayReview?.ProductivityRating == 2)">🐢 Slow (2/5)</option>
+                            <option value="1" selected="@(todayReview?.ProductivityRating == 1)">🛑 Unfocused (1/5)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">✅ What did you accomplish today?</label>
+                    <textarea name="accomplishments" rows="3" placeholder="Wins, finished tasks, key milestones...">@(todayReview?.Accomplishments)</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">⚠️ What was challenging or caused friction?</label>
+                    <textarea name="challenges" rows="2" placeholder="Blockers, distractions, delays...">@(todayReview?.Challenges)</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">📋 What is the priority for tomorrow?</label>
+                    <textarea name="tomorrowPlan" rows="2" placeholder="Key 1-3 tasks to conquer tomorrow...">@(todayReview?.TomorrowPlan)</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">📌 Additional Notes / Thoughts</label>
+                    <textarea name="notes" rows="2" placeholder="Reflections, ideas...">@(todayReview?.Notes)</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('reviewModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Review</button>
+            </div>
+        </form>
     </div>
 </div>

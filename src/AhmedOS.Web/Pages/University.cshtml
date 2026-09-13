@@ -21,6 +21,11 @@
             <h1 class="section-title">🎓 University</h1>
             <p class="section-subtitle">Courses, grades, assignments, and academic progress</p>
         </div>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('addCourseModal').classList.add('active')">
+                ✚ Add Course
+            </button>
+        </div>
     </div>
 
     <!-- STATS -->
@@ -123,6 +128,12 @@
                                             }
                                         </div>
                                     }
+                                    <!-- Add grade action -->
+                                    <div style="margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px dashed var(--border-secondary); display: flex; justify-content: flex-end;">
+                                        <button type="button" class="btn btn-ghost btn-xs" onclick="openGradeModal(@course.Id, '@course.Name')" style="font-size: 11px;">
+                                            ✚ Add Grade
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -154,3 +165,108 @@
         </div>
     </div>
 </div>
+
+<!-- ADD COURSE MODAL -->
+<div class="modal-overlay" id="addCourseModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">🎓 Add University Course</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addCourseModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddCourse">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Course Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. Distributed Systems, Machine Learning" autofocus />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Course Code</label>
+                        <input type="text" name="code" placeholder="e.g. CS401, MATH201" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Professor / Instructor</label>
+                        <input type="text" name="instructor" placeholder="Dr. ..." />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Semester</label>
+                        <input type="text" name="semester" value="Spring 2026" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Credit Hours</label>
+                        <input type="number" name="creditHours" value="3" min="1" max="6" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Color Tag</label>
+                    <input type="color" name="color" value="#3b82f6" style="height: 38px; padding: 2px; width: 100%;" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addCourseModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Course</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ADD GRADE MODAL -->
+<div class="modal-overlay" id="addGradeModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="gradeModalTitle">📝 Add Grade</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addGradeModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddGrade">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="courseId" id="gradeCourseId" />
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Assessment Title *</label>
+                    <input type="text" name="name" required placeholder="e.g. Midterm Exam, Assignment 1, Quiz 2" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="type">
+                            <option value="Assignment">Assignment</option>
+                            <option value="Midterm">Midterm Exam</option>
+                            <option value="Quiz">Quiz</option>
+                            <option value="Project">Project / Lab</option>
+                            <option value="Final">Final Exam</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Weight (%)</label>
+                        <input type="number" name="weight" value="15" min="1" max="100" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Score Earned *</label>
+                        <input type="number" step="0.5" name="score" required placeholder="18" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Score *</label>
+                        <input type="number" step="0.5" name="maxScore" required placeholder="20" min="1" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addGradeModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Grade</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openGradeModal(courseId, courseName) {
+    document.getElementById('gradeCourseId').value = courseId;
+    document.getElementById('gradeModalTitle').textContent = '📝 Add Grade — ' + courseName;
+    document.getElementById('addGradeModal').classList.add('active');
+}
+</script>

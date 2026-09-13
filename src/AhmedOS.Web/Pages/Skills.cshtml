@@ -22,6 +22,11 @@
             <h1 class="section-title">⚡ Career Roadmap — Full Stack .NET Developer</h1>
             <p class="section-subtitle">Track your journey from fundamentals to professional developer</p>
         </div>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('addSkillModal').classList.add('active')">
+                ✚ Add Skill
+            </button>
+        </div>
     </div>
 
     <!-- OVERVIEW -->
@@ -51,6 +56,9 @@
                             <span class="text-xs text-secondary">@statusText</span>
                             <span class="badge @confBadge">@skill.Confidence</span>
                             <span class="text-sm font-semibold">@skill.Progress%</span>
+                            <button type="button" class="btn btn-ghost btn-xs" onclick="openUpdateSkillModal(@skill.Id, '@skill.Name', @skill.Progress, '@skill.Confidence')" style="font-size: 11px; padding: 1px 6px;" title="Update Progress">
+                                ✏️
+                            </button>
                         </div>
                     </div>
                     <div class="progress-bar">
@@ -61,3 +69,105 @@
         </div>
     </div>
 </div>
+
+<!-- ADD SKILL MODAL -->
+<div class="modal-overlay" id="addSkillModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">⚡ Add Technical Skill</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('addSkillModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddSkill">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Skill Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. SignalR, Redis Caching, RabbitMQ" autofocus />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description / Core Topics</label>
+                    <textarea name="description" rows="2" placeholder="Key concepts or projects demonstrating this skill..."></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Current Progress (%)</label>
+                        <input type="number" name="progress" value="20" min="0" max="100" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confidence Level</label>
+                        <select name="confidence">
+                            <option value="@ConfidenceLevel.None">None</option>
+                            <option value="@ConfidenceLevel.Low" selected>Low</option>
+                            <option value="@ConfidenceLevel.Medium">Medium</option>
+                            <option value="@ConfidenceLevel.High">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select name="status">
+                            <option value="@StudyStatus.Learning" selected>Learning</option>
+                            <option value="@StudyStatus.Practicing">Practicing</option>
+                            <option value="@StudyStatus.Mastered">Mastered</option>
+                            <option value="@StudyStatus.NotStarted">Not Started</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Roadmap Sort Order</label>
+                        <input type="number" name="sortOrder" value="20" min="1" max="100" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addSkillModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Skill</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- UPDATE SKILL MODAL -->
+<div class="modal-overlay" id="updateSkillModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="updateSkillTitle">✏️ Update Skill</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('updateSkillModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="UpdateProgress">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="skillId" id="updateSkillId" />
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Mastery Progress (0 - 100%)</label>
+                    <input type="range" name="progress" id="updateSkillProgress" min="0" max="100" oninput="document.getElementById('progressValueText').textContent = this.value + '%'" style="width: 100%;" />
+                    <div style="text-align: right; font-weight: var(--weight-semibold); margin-top: 4px;" id="progressValueText">50%</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confidence</label>
+                    <select name="confidence" id="updateSkillConfidence">
+                        <option value="@ConfidenceLevel.High">High 🚀</option>
+                        <option value="@ConfidenceLevel.Medium">Medium 🙂</option>
+                        <option value="@ConfidenceLevel.Low">Low 😕</option>
+                        <option value="@ConfidenceLevel.None">None ⭕</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('updateSkillModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openUpdateSkillModal(id, name, progress, confidence) {
+    document.getElementById('updateSkillId').value = id;
+    document.getElementById('updateSkillTitle').textContent = '✏️ Update Skill — ' + name;
+    document.getElementById('updateSkillProgress').value = progress;
+    document.getElementById('progressValueText').textContent = progress + '%';
+    document.getElementById('updateSkillConfidence').value = confidence;
+    document.getElementById('updateSkillModal').classList.add('active');
+}
+</script>

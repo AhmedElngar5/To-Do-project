@@ -19,11 +19,18 @@
     var focusGoal = 120; // 2 hours
 }
 
+<form id="antiForgeryForm" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
 <div class="animate-fade-in">
     <div class="section-header">
         <div>
             <h1 class="section-title">🎯 Focus</h1>
             <p class="section-subtitle">Deep work mode — eliminate distractions</p>
+        </div>
+        <div>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('manualLogModal').style.display='flex'">+ Log Manual Session</button>
         </div>
     </div>
 
@@ -31,6 +38,11 @@
         <!-- TIMER -->
         <div class="card" style="text-align: center;">
             <div class="card-body" style="padding: var(--space-8);">
+                <div id="activeTaskBanner" style="display: none; margin-bottom: var(--space-4); padding: var(--space-2) var(--space-4); background: var(--bg-hover); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--accent);">
+                    Focused on: <span id="activeTaskTitle" style="font-weight: var(--weight-bold); color: var(--text-primary);"></span>
+                    <button type="button" class="btn btn-ghost btn-xs" onclick="FocusTimer.clearTask()" style="margin-left: var(--space-2);">✕</button>
+                </div>
+
                 <div id="focusTimerDisplay" style="font-size: 5rem; font-weight: var(--weight-bold); color: var(--text-primary); font-family: var(--font-mono); letter-spacing: 0.05em; line-height: 1;">
                     25:00
                 </div>
@@ -68,12 +80,12 @@
 
             <!-- SUGGESTED TASKS -->
             <div class="card">
-                <div class="card-header"><span class="card-title">Work on</span></div>
+                <div class="card-header"><span class="card-title">Work on (Click to Focus)</span></div>
                 <div class="card-body">
                     @foreach (var task in todayTasks)
                     {
                         var pc = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", _ => "" };
-                        <div class="task-item">
+                        <div class="task-item focus-task-choice" data-id="@task.Id" onclick="FocusTimer.selectTask(@task.Id, '@task.Title.Replace("'", "\\'")')" style="cursor: pointer; transition: all 0.2s ease;">
                             <div class="task-checkbox @pc" data-task-id="@task.Id"></div>
                             <div class="task-content">
                                 <div class="task-title" style="font-size: var(--text-sm);">@task.Title</div>
@@ -94,6 +106,39 @@
     </div>
 </div>
 
+<!-- MANUAL FOCUS LOG MODAL -->
+<div class="modal-backdrop" id="manualLogModal" style="display: none;" onclick="if(event.target === this) this.style.display='none'">
+    <div class="modal" style="max-width: 440px;">
+        <div class="modal-header">
+            <h2 class="modal-title">⏱️ Log Focus Session</h2>
+            <button class="modal-close" onclick="document.getElementById('manualLogModal').style.display='none'">✕</button>
+        </div>
+        <form method="post" asp-page-handler="LogSession">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Duration (Minutes) *</label>
+                    <input type="number" name="actualMinutes" value="25" min="1" max="480" required autofocus />
+                    <input type="hidden" name="plannedMinutes" value="25" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Associated Task (Optional)</label>
+                    <select name="taskId">
+                        <option value="">-- No specific task --</option>
+                        @foreach (var task in todayTasks)
+                        {
+                            <option value="@task.Id">@task.Title</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('manualLogModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Session</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
 <script>
 const FocusTimer = {
@@ -101,6 +146,25 @@ const FocusTimer = {
     remaining: 25 * 60,
     running: false,
     interval: null,
+    selectedTaskId: null,
+
+    selectTask(id, title) {
+        this.selectedTaskId = id;
+        document.getElementById('activeTaskBanner').style.display = 'block';
+        document.getElementById('activeTaskTitle').textContent = title;
+        document.querySelectorAll('.focus-task-choice').forEach(el => {
+            el.style.borderLeft = el.getAttribute('data-id') == id ? '3px solid var(--accent)' : 'none';
+        });
+        if (window.AhmedOS && window.AhmedOS.Toast) {
+            window.AhmedOS.Toast.show(`Focusing on: ${title}`, 'info', 2500);
+        }
+    },
+
+    clearTask() {
+        this.selectedTaskId = null;
+        document.getElementById('activeTaskBanner').style.display = 'none';
+        document.querySelectorAll('.focus-task-choice').forEach(el => el.style.borderLeft = 'none');
+    },
 
     setDuration(minutes) {
         if (this.running) return;
@@ -154,12 +218,36 @@ const FocusTimer = {
         document.getElementById('focusPauseBtn').style.display = 'none';
         document.getElementById('focusStartBtn').style.display = '';
         document.getElementById('focusStartBtn').textContent = '▶ Start New Session';
+        
         if (window.AhmedOS && window.AhmedOS.Toast) {
-            window.AhmedOS.Toast.show('Focus session complete! Great work 🎉', 'success', 5000);
+            window.AhmedOS.Toast.show('Focus session recorded! Great work 🎉', 'success', 5000);
         }
         if (Notification.permission === 'granted') {
             new Notification('Focus Complete!', { body: 'Time for a break. You earned it!' });
         }
+
+        // Auto-save completed session to database
+        const token = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]')?.value;
+        const formData = new FormData();
+        const mins = Math.max(1, Math.round(this.duration / 60));
+        formData.append('plannedMinutes', mins);
+        formData.append('actualMinutes', mins);
+        if (this.selectedTaskId) {
+            formData.append('taskId', this.selectedTaskId);
+        }
+
+        fetch('?handler=LogSession', {
+            method: 'POST',
+            headers: {
+                'RequestVerificationToken': token || ''
+            },
+            body: formData
+        }).then(res => {
+            if (res.ok) {
+                setTimeout(() => location.reload(), 1500);
+            }
+        }).catch(err => console.error('Error logging focus session:', err));
+
         this.remaining = this.duration;
     },
 
