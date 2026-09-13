@@ -1,0 +1,29 @@
+# Auto detect text files and normalize line endings to LF on commit
+* text=auto eol=lf
+
+# Windows-specific files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Source code
+*.cs text diff=csharp
+*.cshtml text
+*.css text
+*.js text
+*.json text
+*.md text
+*.xml text
+*.csproj text
+*.slnx text
+
+# Binary files
+*.dll binary
+*.pdb binary
+*.exe binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary

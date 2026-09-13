@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AhmedOS.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+552dd63b8c2e3f38f9f4fd945c5e9c0dcd41e8c6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7217fd6b5501b49ef6047efba9225f5c0e14e940")]
 [assembly: System.Reflection.AssemblyProductAttribute("AhmedOS.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AhmedOS.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

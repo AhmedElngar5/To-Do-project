@@ -10,17 +10,20 @@ public static class DatabaseSeeder
     public static async Task SeedAsync(AhmedOSDbContext context, UserManager<ApplicationUser> userManager)
     {
         // Create default user if not exists
-        var user = await userManager.FindByEmailAsync("ahmed@ahmeddos.local");
+        var adminEmail = Environment.GetEnvironmentVariable("INITIAL_ADMIN_EMAIL") ?? "ahmed@ahmeddos.local";
+        var adminPassword = Environment.GetEnvironmentVariable("INITIAL_ADMIN_PASSWORD") ?? "Ahmed@OS2024!";
+
+        var user = await userManager.FindByEmailAsync(adminEmail);
         if (user == null)
         {
             user = new ApplicationUser
             {
-                UserName = "ahmed@ahmeddos.local",
-                Email = "ahmed@ahmeddos.local",
+                UserName = adminEmail,
+                Email = adminEmail,
                 FullName = "Ahmed Hany Kamal El Nagar",
                 EmailConfirmed = true
             };
-            await userManager.CreateAsync(user, "Ahmed@OS2024!");
+            await userManager.CreateAsync(user, adminPassword);
         }
 
         var userId = user.Id;

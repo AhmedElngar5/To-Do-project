@@ -1,0 +1,281 @@
+@page
+@using AhmedOS.Domain.Enums
+@model AhmedOS.Web.Pages.WaselModel
+@{
+    ViewData["Title"] = "Wasel — Graduation Project";
+    var project = Model.WaselProject;
+    var totalMilestones = Model.Milestones.Count;
+    var completedMilestones = Model.Milestones.Count(m => m.IsCompleted);
+    var milestoneProgress = totalMilestones > 0 ? (int)((double)completedMilestones / totalMilestones * 100) : 0;
+    var activeTasks = Model.Tasks.Count(t => t.Status != TodoTaskStatus.Completed);
+}
+
+<div class="animate-fade-in">
+    <!-- HEADER -->
+    <div class="section-header" style="margin-bottom: var(--space-4);">
+        <div>
+            <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 4px;">
+                <span style="font-size: 1.5rem;">🔗</span>
+                <h1 class="section-title">Wasel (واصل)</h1>
+                <span class="badge badge-warning">Graduation Project</span>
+                <span class="badge badge-success">Active</span>
+            </div>
+            <p class="section-subtitle">AI-Based Child Family Reunification & Alternative Care Support System</p>
+        </div>
+        <div style="display: flex; gap: var(--space-2);">
+            <button class="btn btn-primary" onclick="document.getElementById('addWaselTaskModal').classList.add('active')">+ Add Track Task</button>
+        </div>
+    </div>
+
+    <!-- OVERVIEW STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Milestones Done</span>
+                <span class="stat-value">@completedMilestones / @totalMilestones</span>
+                <div class="progress-bar mt-2"><div class="progress-bar-fill success" style="width: @milestoneProgress%"></div></div>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Active Sprint Tasks</span>
+                <span class="stat-value">@activeTasks</span>
+                <span class="text-xs text-secondary">Across all tracks</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Target Stack</span>
+                <span class="stat-value" style="font-size: var(--text-md); margin-top: 4px;">.NET 10 + AI</span>
+                <span class="text-xs text-secondary">SQL Server & Angular</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">System Health</span>
+                <span class="stat-value" style="color: var(--color-success-text); font-size: var(--text-lg); display: flex; align-items: center; gap: 4px;">
+                    🟢 Healthy
+                </span>
+                <span class="text-xs text-secondary">On schedule for defense</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUBSYSTEM TRACKS (10 Specific Tracks requested) -->
+    <h2 style="font-size: var(--text-lg); font-weight: var(--weight-semibold); margin-bottom: var(--space-3);">🏗️ Subsystem Tracks & Architecture</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <!-- Track 1: AI & Matching -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>🤖</span> AI & Biometrics
+                </div>
+                <span class="badge badge-info">Core</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Face recognition embeddings, age progression estimation, and multi-vector child-parent similarity scoring.</p>
+        </div>
+
+        <!-- Track 2: NLP & Search -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>🧠</span> NLP & Search
+                </div>
+                <span class="badge badge-info">NLP</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Arabic text extraction from case reports, dialect normalization, and full-text fuzzy matching for missing notices.</p>
+        </div>
+
+        <!-- Track 3: Web Portal -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>🌐</span> Web Portal
+                </div>
+                <span class="badge badge-primary">Frontend</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Case management dashboard for ministries, NGOs, social workers, and alternative care placement workflows.</p>
+        </div>
+
+        <!-- Track 4: Mobile App -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>📱</span> Mobile App
+                </div>
+                <span class="badge badge-neutral">Client</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Citizen sighting report submission, offline image capture, urgent geo-notifications, and verification status.</p>
+        </div>
+
+        <!-- Track 5: Backend & APIs -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>⚙️</span> Backend (.NET 10)
+                </div>
+                <span class="badge badge-success">Backend</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Clean architecture REST APIs, JWT authentication, background match worker queues, and event auditing.</p>
+        </div>
+
+        <!-- Track 6: Database & Security -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>🗄️</span> Database & Security
+                </div>
+                <span class="badge badge-warning">SecOps</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">SQL Server relational store, vector indexing, biometric encryption, role-based privacy, and audit trails.</p>
+        </div>
+
+        <!-- Track 7: Documentation -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>📚</span> Documentation
+                </div>
+                <span class="badge badge-neutral">Academic</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">SRS specification, IEEE architecture report, ethical AI guidelines, and graduation defense presentation.</p>
+        </div>
+
+        <!-- Track 8: Testing & QA -->
+        <div class="card" style="padding: var(--space-4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold);">
+                    <span>🧪</span> Testing & Validation
+                </div>
+                <span class="badge badge-danger">QA</span>
+            </div>
+            <p class="text-xs text-secondary" style="line-height: 1.4;">Unit testing, integration testing, biometric accuracy ROC benchmarks, and security penetration review.</p>
+        </div>
+    </div>
+
+    <!-- TWO COLUMN: MILESTONES & ACTIVE TASKS -->
+    <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--space-4);">
+        <!-- MILESTONES -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🚩 Project Milestones</span>
+                <span class="text-xs text-secondary">@completedMilestones of @totalMilestones completed</span>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: var(--space-2);">
+                @foreach (var m in Model.Milestones)
+                {
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border: 1px solid var(--border-secondary);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <form method="post" asp-page-handler="ToggleMilestone" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="milestoneId" value="@m.Id" />
+                                <button type="submit" style="cursor: pointer; font-size: 16px; background: none; border: none;">
+                                    @(m.IsCompleted ? "✅" : "⚪")
+                                </button>
+                            </form>
+                            <div>
+                                <div style="font-weight: var(--weight-medium); @(m.IsCompleted ? "text-decoration: line-through; opacity: 0.6;" : "")">@m.Title</div>
+                                @if (m.DueDate.HasValue)
+                                {
+                                    <div class="text-xs text-tertiary">Target: @m.DueDate.Value.ToString("MMM d, yyyy")</div>
+                                }
+                            </div>
+                        </div>
+                        <span class="badge @(m.IsCompleted ? "badge-success" : "badge-neutral")">@(m.IsCompleted ? "Completed" : "Pending")</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- TRACK TASKS -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📋 Wasel Sprint Tasks</span>
+                <span class="text-xs text-secondary">@Model.Tasks.Count tasks</span>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 480px; overflow-y: auto;">
+                @if (Model.Tasks.Count == 0)
+                {
+                    <div style="text-align: center; color: var(--text-tertiary); font-size: 13px; padding: var(--space-6);">
+                        No tasks added for Wasel yet. Click "+ Add Track Task" above to organize deliverables!
+                    </div>
+                }
+                @foreach (var task in Model.Tasks)
+                {
+                    var isCompleted = task.Status == TodoTaskStatus.Completed;
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border: 1px solid var(--border-secondary);">
+                        <div>
+                            <div style="font-weight: var(--weight-medium); @(isCompleted ? "text-decoration: line-through; opacity: 0.6;" : "")">@task.Title</div>
+                            <div style="display: flex; gap: var(--space-2); align-items: center; margin-top: 4px;">
+                                @if (!string.IsNullOrEmpty(task.Description))
+                                {
+                                    <span class="text-xs text-secondary">@task.Description</span>
+                                }
+                                @if (task.DueDate.HasValue)
+                                {
+                                    <span class="text-xs text-tertiary">📅 @task.DueDate.Value.ToString("MMM d")</span>
+                                }
+                                @if (task.PriorityScore.HasValue)
+                                {
+                                    <span class="priority-score-badge">⚡ @task.PriorityScore.Value.ToString("0")</span>
+                                }
+                            </div>
+                        </div>
+                        <span class="badge @(task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", Priority.Medium => "badge-info", _ => "badge-neutral" })">@task.Priority</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADD WASEL TASK MODAL -->
+<div class="modal-backdrop" id="addWaselTaskModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Add Wasel Deliverable</span>
+            <button class="modal-close" onclick="document.getElementById('addWaselTaskModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="post" asp-page-handler="AddTask">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Task Title *</label>
+                    <input type="text" name="title" required placeholder="e.g. Build face embedding pipeline with InsightFace" autofocus />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subsystem Track</label>
+                    <select name="track">
+                        <option value="AI & Biometrics">🤖 AI & Biometrics</option>
+                        <option value="NLP & Search">🧠 NLP & Search</option>
+                        <option value="Web Portal">🌐 Web Portal</option>
+                        <option value="Mobile App">📱 Mobile App</option>
+                        <option value="Backend (.NET 10)">⚙️ Backend (.NET 10)</option>
+                        <option value="Database & Security">🗄️ Database & Security</option>
+                        <option value="Documentation">📚 Documentation</option>
+                        <option value="Testing & QA">🧪 Testing & QA</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select name="priority">
+                            <option value="3">Critical 🔥</option>
+                            <option value="2" selected>High ⚠️</option>
+                            <option value="1">Medium</option>
+                            <option value="0">Low</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" name="dueDate" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('addWaselTaskModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Deliverable</button>
+            </div>
+        </form>
+    </div>
+</div>

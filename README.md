@@ -63,9 +63,10 @@ Open [http://localhost:5086](http://localhost:5086)
 - **Planner** — Day/week planner with unscheduled priorities and habits checklist
 - **Calendar** — Monthly interactive grid with events and task deadlines
 
-### 🚀 Work
+### 🚀 Work & Graduation Project
 - **Projects** — Milestones, progress tracking, health indicators
-- **Goals** — Hierarchical (Vision → Year → Quarter → Month)
+- **Wasel (Graduation Project)** — Dedicated workspace for *AI-Based Child Family Reunification & Alternative Care Support System* across 8 subsystem tracks (AI & Biometrics, NLP & Search, Web Portal, Mobile App, Backend, Database & Security, Docs, QA)
+- **Goals** — Hierarchical (Vision → Year → Quarter → Month) with AI Break Down
 - **Habits** — Weekly tracker with streaks
 
 ### 📚 Learning
@@ -78,10 +79,19 @@ Open [http://localhost:5086](http://localhost:5086)
 ### 💼 Career
 - **Career** — Job application pipeline with status tracking
 
-### 📊 Analytics & Review
+### 📊 Analytics, Backup & Review
 - **Analytics** — Productivity stats and metrics
+- **Data Export** — Full JSON backup archive & CSV task export
 - **Reviews** — Daily/weekly reflection with mood tracking
 - **Notes** — Knowledge base with markdown support
+
+## 📖 Documentation
+- [Architecture & Design](ARCHITECTURE.md)
+- [Database Schema & Entities](DATABASE.md)
+- [REST API Reference](API.md)
+- [Production Deployment Guide](DEPLOYMENT.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## 🔐 Security
 - ASP.NET Core Identity with cookie auth
