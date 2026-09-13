@@ -1,0 +1,79 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.CareerModel
+@{
+    ViewData["Title"] = "Career";
+    var userId = UserManager.GetUserId(User);
+    var applications = await Db.JobApplications.Where(j => j.UserId == userId).Include(j => j.Company).OrderByDescending(j => j.ApplicationDate).ToListAsync();
+    var skills = await Db.Skills.Where(s => s.UserId == userId).OrderBy(s => s.SortOrder).ToListAsync();
+
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">💼 Career</h1>
+            <p class="section-subtitle">Job search, applications, networking, and professional development</p>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Applications</span><span class="stat-value">@applications.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Active</span><span class="stat-value">@applications.Count(a => a.Status == JobApplicationStatus.Applied || a.Status == JobApplicationStatus.TechnicalInterview || a.Status == JobApplicationStatus.Screening)</span></div></div>
+
+    </div>
+
+    <div class="widget-grid">
+        <!-- APPLICATIONS -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">📋 Job Applications</span>
+            </div>
+            <div class="card-body">
+                @if (applications.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">💼</div>
+                        <div class="empty-state-title">No applications yet</div>
+                        <div class="empty-state-text">Start tracking your job applications to stay organized.</div>
+                    </div>
+                }
+                else
+                {
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Company</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Position</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Status</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Applied</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var app in applications)
+                                {
+                                    var badge = app.Status switch { JobApplicationStatus.Applied => "badge-info", JobApplicationStatus.TechnicalInterview => "badge-primary", JobApplicationStatus.Screening => "badge-warning", JobApplicationStatus.Offer => "badge-success", JobApplicationStatus.Rejected => "badge-danger", _ => "badge-neutral" };
+                                    <tr style="border-top: 1px solid var(--border-secondary);">
+                                        <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">@(app.Company?.Name ?? "—")</td>
+                                        <td style="padding: var(--space-2) var(--space-3); color: var(--text-secondary);">@app.Position</td>
+                                        <td style="padding: var(--space-2) var(--space-3);"><span class="badge @badge">@app.Status</span></td>
+                                        <td style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-tertiary);">@(app.ApplicationDate?.ToString("MMM d") ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+
+    </div>
+</div>

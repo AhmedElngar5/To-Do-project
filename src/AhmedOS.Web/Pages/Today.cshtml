@@ -1,0 +1,204 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.TodayModel
+@{
+    ViewData["Title"] = "Today";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var tomorrow = today.AddDays(1);
+
+    var allTasks = await Db.TodoTasks
+        .Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled)
+        .Include(t => t.Category).Include(t => t.Project)
+        .ToListAsync();
+
+    var todayTasks = allTasks.Where(t => t.DueDate?.Date == today).OrderByDescending(t => t.Priority).ToList();
+    var overdueTasks = allTasks.Where(t => t.DueDate < today).OrderByDescending(t => t.Priority).ToList();
+    var tomorrowTasks = allTasks.Where(t => t.DueDate?.Date == tomorrow).OrderByDescending(t => t.Priority).ToList();
+    var unscheduled = allTasks.Where(t => t.DueDate == null).OrderByDescending(t => t.Priority).Take(5).ToList();
+
+    var top3 = allTasks
+        .OrderByDescending(t => t.Priority)
+        .ThenBy(t => t.DueDate ?? DateTime.MaxValue)
+        .Take(3).ToList();
+
+    var nextAction = top3.FirstOrDefault();
+    var completedToday = await Db.TodoTasks.CountAsync(t => t.UserId == userId && t.CompletedAt != null && t.CompletedAt.Value.Date == today);
+    var totalForToday = todayTasks.Count + overdueTasks.Count + completedToday;
+    var progress = totalForToday > 0 ? (int)((double)completedToday / totalForToday * 100) : 0;
+
+    // Habits
+    var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).ToListAsync();
+    var todayEntries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date.Date == today).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📌 Today</h1>
+            <p class="section-subtitle">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-secondary">@completedToday / @totalForToday completed</span>
+            <div class="progress-bar" style="width: 100px;">
+                <div class="progress-bar-fill @(progress >= 80 ? "success" : "")" style="width: @progress%"></div>
+            </div>
+            <span class="font-semibold">@progress%</span>
+        </div>
+    </div>
+
+    <!-- DO NOW -->
+    @if (nextAction != null)
+    {
+        <div class="card mb-4" style="border-left: 3px solid var(--color-primary);">
+            <div class="card-body" style="display: flex; align-items: center; gap: var(--space-4);">
+                <div style="flex: 1;">
+                    <span class="badge badge-primary">DO NOW</span>
+                    <h3 style="font-size: var(--text-lg); font-weight: var(--weight-semibold); margin-top: var(--space-2);">@nextAction.Title</h3>
+                    <div class="flex items-center gap-2 mt-2">
+                        @if (nextAction.Category != null) { <span class="badge badge-neutral">@nextAction.Category.Icon @nextAction.Category.Name</span> }
+                        @if (nextAction.EstimatedMinutes != null) { <span class="task-meta-item">⏱️ @nextAction.EstimatedMinutes min</span> }
+                    </div>
+                </div>
+                <a href="/Focus" class="btn btn-primary">▶ Start Focus</a>
+            </div>
+        </div>
+    }
+
+    <div class="widget-grid" style="grid-template-columns: 1fr 300px;">
+        <div>
+            <!-- TOP 3 PRIORITIES -->
+            <div class="mb-4">
+                <h2 style="font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-primary); margin-bottom: var(--space-3);">🎯 TOP 3</h2>
+                @foreach (var task in top3)
+                {
+                    var priorityClass = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", Priority.Medium => "priority-medium", _ => "priority-low" };
+                    <div class="task-item">
+                        <div class="task-checkbox @priorityClass" data-task-id="@task.Id"></div>
+                        <div class="task-content">
+                            <div class="task-title">@task.Title</div>
+                            <div class="task-meta">
+                                @if (task.DueDate != null)
+                                {
+                                    var d = (task.DueDate.Value.Date - today).Days;
+                                    <span class="task-meta-item @(d < 0 ? "overdue" : d == 0 ? "today" : "")">📅 @(d < 0 ? "Overdue" : d == 0 ? "Today" : $"In {d}d")</span>
+                                }
+                                @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
+                                @if (task.Project != null) { <span class="task-meta-item">🚀 @task.Project.Name</span> }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- OVERDUE -->
+            @if (overdueTasks.Count > 0)
+            {
+                <div class="mb-4">
+                    <h2 style="font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--color-danger-text); margin-bottom: var(--space-3);">⚠️ Overdue (@overdueTasks.Count)</h2>
+                    @foreach (var task in overdueTasks)
+                    {
+                        <div class="task-item">
+                            <div class="task-checkbox priority-critical" data-task-id="@task.Id"></div>
+                            <div class="task-content">
+                                <div class="task-title">@task.Title</div>
+                                <div class="task-meta"><span class="task-meta-item overdue">@((today - task.DueDate!.Value.Date).Days)d overdue</span></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- SCHEDULED -->
+            <div class="mb-4">
+                <h2 style="font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-primary); margin-bottom: var(--space-3);">📋 Schedule (@todayTasks.Count)</h2>
+                @if (todayTasks.Count == 0)
+                {
+                    <p class="text-sm text-secondary" style="padding: var(--space-4);">No tasks scheduled for today.</p>
+                }
+                @foreach (var task in todayTasks)
+                {
+                    var priorityClass = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", Priority.Medium => "priority-medium", _ => "priority-low" };
+                    <div class="task-item">
+                        <div class="task-checkbox @priorityClass" data-task-id="@task.Id"></div>
+                        <div class="task-content">
+                            <div class="task-title">@task.Title</div>
+                            <div class="task-meta">
+                                @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
+                                @if (task.EstimatedMinutes != null) { <span class="task-meta-item">⏱️ @task.EstimatedMinutes min</span> }
+                                <span class="badge @(task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", _ => "badge-neutral" })">@task.Priority</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- LATER / TOMORROW -->
+            @if (tomorrowTasks.Count > 0)
+            {
+                <div class="mb-4">
+                    <h2 style="font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-secondary); margin-bottom: var(--space-3);">📅 Tomorrow (@tomorrowTasks.Count)</h2>
+                    @foreach (var task in tomorrowTasks.Take(5))
+                    {
+                        <div class="task-item" style="opacity: 0.7;">
+                            <div class="task-checkbox" data-task-id="@task.Id"></div>
+                            <div class="task-content">
+                                <div class="task-title">@task.Title</div>
+                                <div class="task-meta">
+                                    @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- RIGHT SIDEBAR -->
+        <div>
+            <!-- HABITS -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <span class="card-title">🔄 Habits</span>
+                </div>
+                <div class="card-body">
+                    @foreach (var habit in habits)
+                    {
+                        var isDone = todayEntries.Any(e => e.HabitId == habit.Id && e.IsCompleted);
+                        <div class="habit-row">
+                            <span class="habit-icon">@habit.Icon</span>
+                            <span class="habit-name">@habit.Name</span>
+                            <div class="habit-check @(isDone ? "done" : "")" data-habit-id="@habit.Id"></div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- UNSCHEDULED -->
+            @if (unscheduled.Count > 0)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📌 Optional</span>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var task in unscheduled)
+                        {
+                            <div class="task-item" style="opacity: 0.6;">
+                                <div class="task-checkbox" data-task-id="@task.Id"></div>
+                                <div class="task-content">
+                                    <div class="task-title" style="font-size: var(--text-sm);">@task.Title</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

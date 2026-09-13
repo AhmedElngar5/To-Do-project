@@ -1,0 +1,47 @@
+@page
+@model AhmedOS.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Sign In";
+    Layout = "_Layout";
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="auth-logo-icon">A</div>
+            <span class="auth-logo-text">Ahmed OS</span>
+        </div>
+
+        <h2 style="text-align: center; font-size: var(--text-xl); margin-bottom: var(--space-6); color: var(--text-secondary); font-weight: var(--weight-normal);">
+            Sign in to your workspace
+        </h2>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div style="background: var(--color-danger-subtle); color: var(--color-danger-text); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4); font-size: var(--text-sm);">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form method="post" class="auth-form">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label class="form-label" for="email">Email</label>
+                <input type="email" id="email" name="Email" asp-for="Email" placeholder="ahmed@ahmeddos.local" required autofocus />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="Password" asp-for="Password" placeholder="Enter your password" required />
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; gap: var(--space-2);">
+                <input type="checkbox" name="RememberMe" asp-for="RememberMe" id="rememberMe" style="width: auto;" />
+                <label for="rememberMe" class="form-label" style="margin-bottom: 0;">Remember me</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Sign In</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Default: <code style="color: var(--text-primary);">ahmed@ahmeddos.local</code> / <code style="color: var(--text-primary);">Ahmed@OS2024!</code></p>
+        </div>
+    </div>
+</div>

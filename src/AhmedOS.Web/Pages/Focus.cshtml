@@ -1,0 +1,178 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.FocusModel
+@{
+    ViewData["Title"] = "Focus";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var todayTasks = await Db.TodoTasks
+        .Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled)
+        .OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate)
+        .Take(5).ToListAsync();
+    var sessions = await Db.FocusSessions.Where(f => f.UserId == userId && f.StartTime.Date == today).ToListAsync();
+    var totalFocus = sessions.Sum(s => s.ActualMinutes ?? 0);
+    var focusGoal = 120; // 2 hours
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🎯 Focus</h1>
+            <p class="section-subtitle">Deep work mode — eliminate distractions</p>
+        </div>
+    </div>
+
+    <div class="widget-grid" style="grid-template-columns: 1fr 320px;">
+        <!-- TIMER -->
+        <div class="card" style="text-align: center;">
+            <div class="card-body" style="padding: var(--space-8);">
+                <div id="focusTimerDisplay" style="font-size: 5rem; font-weight: var(--weight-bold); color: var(--text-primary); font-family: var(--font-mono); letter-spacing: 0.05em; line-height: 1;">
+                    25:00
+                </div>
+                <p id="focusLabel" style="color: var(--text-secondary); margin-top: var(--space-2); font-size: var(--text-md);">Ready to focus</p>
+
+                <div style="margin-top: var(--space-6); display: flex; justify-content: center; gap: var(--space-3);">
+                    <button class="btn btn-primary btn-lg" id="focusStartBtn" onclick="FocusTimer.start()">▶ Start Focus</button>
+                    <button class="btn btn-secondary btn-lg" id="focusPauseBtn" onclick="FocusTimer.pause()" style="display: none;">⏸ Pause</button>
+                    <button class="btn btn-ghost btn-lg" id="focusResetBtn" onclick="FocusTimer.reset()" style="display: none;">↺ Reset</button>
+                </div>
+
+                <div style="margin-top: var(--space-6); display: flex; justify-content: center; gap: var(--space-4);">
+                    <button class="btn btn-ghost btn-sm" onclick="FocusTimer.setDuration(15)">15m</button>
+                    <button class="btn btn-ghost btn-sm" onclick="FocusTimer.setDuration(25)" style="font-weight: var(--weight-bold);">25m</button>
+                    <button class="btn btn-ghost btn-sm" onclick="FocusTimer.setDuration(45)">45m</button>
+                    <button class="btn btn-ghost btn-sm" onclick="FocusTimer.setDuration(60)">60m</button>
+                    <button class="btn btn-ghost btn-sm" onclick="FocusTimer.setDuration(90)">90m</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <div>
+            <!-- TODAY'S FOCUS -->
+            <div class="card mb-4">
+                <div class="card-header"><span class="card-title">Today's Focus</span></div>
+                <div class="card-body">
+                    <div class="stat-widget" style="text-align: center;">
+                        <span class="stat-value">@totalFocus min</span>
+                        <span class="stat-label">of @focusGoal min goal</span>
+                        <div class="progress-bar mt-2"><div class="progress-bar-fill @(totalFocus >= focusGoal ? "success" : "")" style="width: @Math.Min(100, (int)((double)totalFocus / focusGoal * 100))%"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUGGESTED TASKS -->
+            <div class="card">
+                <div class="card-header"><span class="card-title">Work on</span></div>
+                <div class="card-body">
+                    @foreach (var task in todayTasks)
+                    {
+                        var pc = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", _ => "" };
+                        <div class="task-item">
+                            <div class="task-checkbox @pc" data-task-id="@task.Id"></div>
+                            <div class="task-content">
+                                <div class="task-title" style="font-size: var(--text-sm);">@task.Title</div>
+                                @if (task.EstimatedMinutes != null)
+                                {
+                                    <div class="task-meta"><span class="task-meta-item">⏱️ @task.EstimatedMinutes min</span></div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    @if (todayTasks.Count == 0)
+                    {
+                        <p class="text-sm text-secondary" style="padding: var(--space-3);">No pending tasks. Great job!</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const FocusTimer = {
+    duration: 25 * 60,
+    remaining: 25 * 60,
+    running: false,
+    interval: null,
+
+    setDuration(minutes) {
+        if (this.running) return;
+        this.duration = minutes * 60;
+        this.remaining = this.duration;
+        this.updateDisplay();
+    },
+
+    start() {
+        if (this.running) return;
+        this.running = true;
+        document.getElementById('focusStartBtn').style.display = 'none';
+        document.getElementById('focusPauseBtn').style.display = '';
+        document.getElementById('focusResetBtn').style.display = '';
+        document.getElementById('focusLabel').textContent = 'Stay focused...';
+
+        this.interval = setInterval(() => {
+            this.remaining--;
+            this.updateDisplay();
+            if (this.remaining <= 0) {
+                this.complete();
+            }
+        }, 1000);
+    },
+
+    pause() {
+        this.running = false;
+        clearInterval(this.interval);
+        document.getElementById('focusStartBtn').style.display = '';
+        document.getElementById('focusStartBtn').textContent = '▶ Resume';
+        document.getElementById('focusPauseBtn').style.display = 'none';
+        document.getElementById('focusLabel').textContent = 'Paused';
+    },
+
+    reset() {
+        this.running = false;
+        clearInterval(this.interval);
+        this.remaining = this.duration;
+        this.updateDisplay();
+        document.getElementById('focusStartBtn').style.display = '';
+        document.getElementById('focusStartBtn').textContent = '▶ Start Focus';
+        document.getElementById('focusPauseBtn').style.display = 'none';
+        document.getElementById('focusResetBtn').style.display = 'none';
+        document.getElementById('focusLabel').textContent = 'Ready to focus';
+    },
+
+    complete() {
+        this.running = false;
+        clearInterval(this.interval);
+        document.getElementById('focusLabel').textContent = '🎉 Session complete!';
+        document.getElementById('focusPauseBtn').style.display = 'none';
+        document.getElementById('focusStartBtn').style.display = '';
+        document.getElementById('focusStartBtn').textContent = '▶ Start New Session';
+        if (window.AhmedOS && window.AhmedOS.Toast) {
+            window.AhmedOS.Toast.show('Focus session complete! Great work 🎉', 'success', 5000);
+        }
+        if (Notification.permission === 'granted') {
+            new Notification('Focus Complete!', { body: 'Time for a break. You earned it!' });
+        }
+        this.remaining = this.duration;
+    },
+
+    updateDisplay() {
+        const m = Math.floor(this.remaining / 60);
+        const s = this.remaining % 60;
+        document.getElementById('focusTimerDisplay').textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        document.title = `${m}:${s.toString().padStart(2, '0')} — Focus — Ahmed OS`;
+    }
+};
+
+if (Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+</script>
+}

@@ -1,0 +1,84 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.StudyModel
+@{
+    ViewData["Title"] = "Study";
+    var userId = UserManager.GetUserId(User);
+    var topics = await Db.StudyTopics.Where(s => s.UserId == userId).OrderByDescending(s => s.Progress).ToListAsync();
+    var sessions = await Db.StudySessions.Where(s => s.UserId == userId).OrderByDescending(s => s.StartTime).Take(10).ToListAsync();
+    var today = DateTime.UtcNow.Date;
+    var todayStudy = sessions.Where(s => s.StartTime.Date == today).Sum(s => s.DurationMinutes);
+    var weekStudy = sessions.Where(s => s.StartTime.Date >= today.AddDays(-6)).Sum(s => s.DurationMinutes);
+    var avgDifficulty = topics.Count > 0 ? topics.Average(t => (int)t.Difficulty) : 0;
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📚 Study</h1>
+            <p class="section-subtitle">Track your learning progress across all topics</p>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Topics</span><span class="stat-value">@topics.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Study Today</span><span class="stat-value">@todayStudy min</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">This Week</span><span class="stat-value">@weekStudy min</span></div></div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Avg Progress</span>
+                <span class="stat-value">@(topics.Count > 0 ? (int)topics.Average(t => t.Progress) : 0)%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOPICS -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Study Topics</span>
+        </div>
+        <div class="card-body">
+            @foreach (var topic in topics)
+            {
+                var statusColor = topic.Status switch {
+                    StudyStatus.Learning => "var(--color-info)",
+                    StudyStatus.Practicing => "var(--color-success)",
+                    StudyStatus.Mastered => "var(--color-success)",
+                    StudyStatus.NeedsReview => "var(--color-warning)",
+                    _ => "var(--text-secondary)"
+                };
+                var confBadge = topic.Confidence switch {
+                    ConfidenceLevel.High => "badge-success",
+                    ConfidenceLevel.Medium => "badge-info",
+                    ConfidenceLevel.Low => "badge-warning",
+                    _ => "badge-neutral"
+                };
+                <div style="padding: var(--space-3) 0; border-bottom: 1px solid var(--border-secondary); display: flex; align-items: center; gap: var(--space-3);">
+                    <span style="font-size: var(--text-lg); width: 28px; text-align: center;">@(topic.Icon ?? "📗")</span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="flex items-center justify-between mb-2">
+                            <span style="font-weight: var(--weight-medium);">@topic.Name</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge @confBadge">@topic.Confidence</span>
+                                <span style="font-size: var(--text-xs); color: @statusColor; font-weight: var(--weight-semibold);">@topic.Status</span>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: @topic.Progress%"></div>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-xs text-tertiary">Difficulty: @topic.Difficulty</span>
+                            <span class="text-xs text-secondary">@topic.Progress%</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

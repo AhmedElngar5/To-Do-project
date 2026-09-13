@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AhmedOS.Application/AhmedOS.Application.csproj" />
+    <Project Path="src/AhmedOS.Domain/AhmedOS.Domain.csproj" />
+    <Project Path="src/AhmedOS.Infrastructure/AhmedOS.Infrastructure.csproj" />
+    <Project Path="src/AhmedOS.Web/AhmedOS.Web.csproj" />
+  </Folder>
+</Solution>

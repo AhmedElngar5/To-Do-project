@@ -1,0 +1,134 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.GoalsModel
+@{
+    ViewData["Title"] = "Goals";
+    var userId = UserManager.GetUserId(User);
+    var goals = await Db.Goals
+        .Where(g => g.UserId == userId && g.ParentGoalId == null)
+        .Include(g => g.SubGoals)
+        .Include(g => g.Tasks)
+        .OrderBy(g => g.Level)
+        .ThenByDescending(g => g.Priority)
+        .ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🎯 Goals</h1>
+            <p class="section-subtitle">Vision → Year → Quarter → Month → Week → Day</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('createGoalModal').classList.add('active')">+ New Goal</button>
+    </div>
+
+    @if (goals.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">🎯</div>
+            <div class="empty-state-title">No goals yet</div>
+            <div class="empty-state-text">Set a goal to start tracking your progress toward what matters.</div>
+        </div>
+    }
+    else
+    {
+        @foreach (var goal in goals)
+        {
+            var statusBadge = goal.Status switch { GoalStatus.OnTrack => "badge-success", GoalStatus.AtRisk => "badge-warning", GoalStatus.Behind => "badge-danger", GoalStatus.Completed => "badge-neutral", _ => "badge-neutral" };
+            var levelBadge = goal.Level switch { GoalLevel.Vision => "badge-primary", GoalLevel.Yearly => "badge-info", _ => "badge-neutral" };
+            var activeTasks = goal.Tasks.Count(t => t.Status != TodoTaskStatus.Completed && !t.IsDeleted);
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="flex items-center gap-3">
+                        <span class="badge @levelBadge">@goal.Level</span>
+                        <span class="card-title" style="font-size: var(--text-lg);">@goal.Title</span>
+                    </div>
+                    <span class="badge @statusBadge">@goal.Status</span>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(goal.WhyItMatters))
+                    {
+                        <p class="text-sm text-secondary mb-4" style="font-style: italic;">💡 @goal.WhyItMatters</p>
+                    }
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-secondary">Progress</span>
+                        <span class="text-sm font-semibold">@goal.Progress%</span>
+                    </div>
+                    <div class="progress-bar mb-4">
+                        <div class="progress-bar-fill @(goal.Status == GoalStatus.OnTrack ? "success" : goal.Status == GoalStatus.Behind ? "danger" : "")" style="width: @goal.Progress%"></div>
+                    </div>
+                    @if (activeTasks > 0)
+                    {
+                        <span class="text-xs text-secondary">@activeTasks active task@(activeTasks != 1 ? "s" : "")</span>
+                    }
+
+                    @if (goal.SubGoals.Count > 0)
+                    {
+                        <div style="margin-top: var(--space-4); padding-left: var(--space-4); border-left: 2px solid var(--border-primary);">
+                            @foreach (var sub in goal.SubGoals.Where(s => !s.IsDeleted).OrderByDescending(s => s.Priority))
+                            {
+                                var subBadge = sub.Status switch { GoalStatus.OnTrack => "badge-success", GoalStatus.AtRisk => "badge-warning", GoalStatus.Behind => "badge-danger", GoalStatus.Completed => "badge-neutral", _ => "badge-neutral" };
+                                <div style="padding: var(--space-2) 0; display: flex; align-items: center; gap: var(--space-3);">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: var(--text-md); font-weight: var(--weight-medium);">@sub.Title</div>
+                                        <div class="progress-bar mt-2" style="max-width: 200px;">
+                                            <div class="progress-bar-fill" style="width: @sub.Progress%"></div>
+                                        </div>
+                                    </div>
+                                    <span class="badge @subBadge">@sub.Status</span>
+                                    <span class="text-sm text-secondary">@sub.Progress%</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<div class="modal-backdrop" id="createGoalModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">New Goal</span>
+            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createGoalModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateGoal">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Goal Title *</label>
+                    <input type="text" name="Title" required placeholder="What do you want to achieve?" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Why it matters</label>
+                    <textarea name="WhyItMatters" rows="2" placeholder="Why is this important to you?"></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Level</label>
+                        <select name="Level">
+                            @foreach (GoalLevel lv in Enum.GetValues<GoalLevel>())
+                            {
+                                <option value="@((int)lv)">@lv</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Deadline</label>
+                        <input type="date" name="Deadline" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createGoalModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Goal</button>
+            </div>
+        </form>
+    </div>
+</div>

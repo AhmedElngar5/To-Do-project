@@ -1,0 +1,156 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.HabitsModel
+@{
+    ViewData["Title"] = "Habits";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).OrderBy(h => h.Name).ToListAsync();
+
+    // Get the last 7 days of entries
+    var weekStart = today.AddDays(-6);
+    var entries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date >= weekStart && e.Date <= today).ToListAsync();
+
+    var days = Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i)).ToList();
+    var totalHabitsWeek = habits.Count * 7;
+    var completedWeek = entries.Count(e => e.IsCompleted);
+    var weekPercent = totalHabitsWeek > 0 ? (int)((double)completedWeek / totalHabitsWeek * 100) : 0;
+
+    // Current streak (simplified: count consecutive days with all habits done)
+    var streak = 0;
+    for (var d = today; d >= today.AddDays(-90); d = d.AddDays(-1))
+    {
+        var dayEntries = entries.Where(e => e.Date.Date == d);
+        if (dayEntries.Count(e => e.IsCompleted) >= habits.Count && habits.Count > 0) streak++;
+        else break;
+    }
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🔄 Habits</h1>
+            <p class="section-subtitle">Build consistency, build your future</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('createHabitModal').classList.add('active')">+ New Habit</button>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Current Streak</span>
+                <span class="stat-value">@streak 🔥</span>
+                <span class="text-xs text-secondary">day@(streak != 1 ? "s" : "")</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">This Week</span>
+                <span class="stat-value">@weekPercent%</span>
+                <div class="progress-bar mt-2"><div class="progress-bar-fill @(weekPercent >= 80 ? "success" : "")" style="width: @weekPercent%"></div></div>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Today</span>
+                <span class="stat-value">@entries.Count(e => e.Date.Date == today && e.IsCompleted)/@habits.Count</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Active Habits</span>
+                <span class="stat-value">@habits.Count</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- HABIT TRACKER GRID -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Weekly Tracker</span>
+        </div>
+        <div class="card-body" style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary); font-weight: var(--weight-medium); min-width: 140px;">Habit</th>
+                        @foreach (var day in days)
+                        {
+                            var isToday = day.Date == today;
+                            <th style="text-align: center; padding: var(--space-2); font-size: var(--text-xs); color: @(isToday ? "var(--color-primary-text)" : "var(--text-tertiary)"); font-weight: var(--weight-medium); width: 50px;">
+                                <div>@day.ToString("ddd")</div>
+                                <div style="font-size: var(--text-xs);">@day.Day</div>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var habit in habits)
+                    {
+                        <tr style="border-top: 1px solid var(--border-secondary);">
+                            <td style="padding: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+                                <span>@habit.Icon</span>
+                                <span style="font-size: var(--text-md); font-weight: var(--weight-medium);">@habit.Name</span>
+                            </td>
+                            @foreach (var day in days)
+                            {
+                                var done = entries.Any(e => e.HabitId == habit.Id && e.Date.Date == day.Date && e.IsCompleted);
+                                var isToday = day.Date == today;
+                                <td style="text-align: center; padding: var(--space-2);">
+                                    <div class="habit-check @(done ? "done" : "")" data-habit-id="@habit.Id" style="margin: 0 auto; @(isToday ? "" : "opacity: 0.6;")"></div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (habits.Count == 0)
+    {
+        <div class="empty-state mt-6">
+            <div class="empty-state-icon">🔄</div>
+            <div class="empty-state-title">No habits yet</div>
+            <div class="empty-state-text">Start building daily routines to compound your growth.</div>
+        </div>
+    }
+</div>
+
+<div class="modal-backdrop" id="createHabitModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">New Habit</span>
+            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createHabitModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateHabit">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Habit Name *</label>
+                    <input type="text" name="Name" required placeholder="e.g. Study for 1 hour" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Icon</label>
+                        <input type="text" name="Icon" placeholder="📚" value="📚" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Color</label>
+                        <input type="color" name="Color" value="#6366f1" style="height: 38px;" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createHabitModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Habit</button>
+            </div>
+        </form>
+    </div>
+</div>

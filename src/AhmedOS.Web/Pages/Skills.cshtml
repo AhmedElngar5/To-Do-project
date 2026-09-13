@@ -1,0 +1,63 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.SkillsModel
+@{
+    ViewData["Title"] = "Skills";
+    var userId = UserManager.GetUserId(User);
+    var skills = await Db.Skills.Where(s => s.UserId == userId).OrderBy(s => s.SortOrder).ToListAsync();
+    var totalProgress = skills.Count > 0 ? (int)skills.Average(s => s.Progress) : 0;
+    var mastered = skills.Count(s => s.Progress >= 80);
+    var learning = skills.Count(s => s.Progress > 0 && s.Progress < 80);
+    var notStarted = skills.Count(s => s.Progress == 0);
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">⚡ Career Roadmap — Full Stack .NET Developer</h1>
+            <p class="section-subtitle">Track your journey from fundamentals to professional developer</p>
+        </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Overall</span><span class="stat-value">@totalProgress%</span><div class="progress-bar mt-2"><div class="progress-bar-fill" style="width: @totalProgress%"></div></div></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Mastered</span><span class="stat-value" style="color: var(--color-success-text)">@mastered</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">In Progress</span><span class="stat-value" style="color: var(--color-primary-text)">@learning</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Not Started</span><span class="stat-value">@notStarted</span></div></div>
+    </div>
+
+    <!-- SKILL ROADMAP -->
+    <div class="card">
+        <div class="card-header"><span class="card-title">Skill Progression</span></div>
+        <div class="card-body">
+            @foreach (var skill in skills)
+            {
+                var barColor = skill.Progress >= 80 ? "var(--color-success)" : skill.Progress >= 50 ? "var(--color-primary)" : skill.Progress > 0 ? "var(--color-warning)" : "var(--bg-hover)";
+                var confBadge = skill.Confidence switch { ConfidenceLevel.High => "badge-success", ConfidenceLevel.Medium => "badge-info", ConfidenceLevel.Low => "badge-warning", _ => "badge-neutral" };
+                var statusText = skill.Status switch { StudyStatus.Mastered => "✅ Mastered", StudyStatus.Practicing => "🔄 Practicing", StudyStatus.Learning => "📖 Learning", StudyStatus.NeedsReview => "🔍 Review", _ => "⬜ Not Started" };
+                <div style="padding: var(--space-3) 0; border-bottom: 1px solid var(--border-secondary);">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span style="width: 24px; text-align: center; font-size: var(--text-xs); color: var(--text-tertiary);">@skill.SortOrder</span>
+                            <span style="font-weight: var(--weight-medium);">@skill.Name</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-secondary">@statusText</span>
+                            <span class="badge @confBadge">@skill.Confidence</span>
+                            <span class="text-sm font-semibold">@skill.Progress%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: @skill.Progress%; background: @barColor;"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

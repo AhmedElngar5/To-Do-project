@@ -1,0 +1,98 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.NotesModel
+@{
+    ViewData["Title"] = "Notes";
+    var userId = UserManager.GetUserId(User);
+    var notes = await Db.Notes.Where(n => n.UserId == userId).OrderByDescending(n => n.IsPinned).ThenByDescending(n => n.UpdatedAt).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📝 Notes</h1>
+            <p class="section-subtitle">@notes.Count note@(notes.Count != 1 ? "s" : "")</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('createNoteModal').classList.add('active')">+ New Note</button>
+    </div>
+
+    @if (notes.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-title">No notes yet</div>
+            <div class="empty-state-text">Capture your thoughts, ideas, and reference material.</div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+            @foreach (var note in notes)
+            {
+                var typeBadge = note.Type switch { NoteType.Study => "badge-info", NoteType.Project => "badge-primary", NoteType.Meeting => "badge-warning", NoteType.Idea => "badge-success", _ => "badge-neutral" };
+                <div class="card" style="cursor: pointer;">
+                    <div class="card-body">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 style="font-size: var(--text-md); font-weight: var(--weight-semibold);">
+                                @(note.IsPinned ? "📌 " : "")@note.Title
+                            </h3>
+                            <span class="badge @typeBadge">@note.Type</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(note.Content))
+                        {
+                            <p class="text-sm text-secondary" style="line-height: 1.5; max-height: 4.5em; overflow: hidden; text-overflow: ellipsis;">
+                                @(note.Content.Length > 200 ? note.Content[..200] + "..." : note.Content)
+                            </p>
+                        }
+                        <div class="flex items-center justify-between mt-4">
+                            <span class="text-xs text-tertiary">@(note.UpdatedAt.ToString("MMM d, h:mm tt"))</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="modal-backdrop" id="createNoteModal">
+    <div class="modal" style="max-width: 640px;">
+        <div class="modal-header">
+            <span class="modal-title">New Note</span>
+            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createNoteModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateNote">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group"><label class="form-label">Title *</label><input type="text" name="Title" required placeholder="Note title" /></div>
+                <div class="form-group">
+                    <label class="form-label">Content</label>
+                    <textarea name="Content" rows="8" placeholder="Write your note..." style="font-family: var(--font-family); resize: vertical;"></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="Type">
+                            @foreach (NoteType nt in Enum.GetValues<NoteType>())
+                            {
+                                <option value="@((int)nt)">@nt</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end; gap: var(--space-2); padding-bottom: var(--space-4);">
+                        <input type="checkbox" name="IsPinned" id="pinNote" style="width: auto;" />
+                        <label for="pinNote" class="form-label" style="margin-bottom: 0;">📌 Pin this note</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createNoteModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Note</button>
+            </div>
+        </form>
+    </div>
+</div>

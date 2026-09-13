@@ -1,0 +1,164 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.AnalyticsModel
+@{
+    ViewData["Title"] = "Analytics";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var weekStart = today.AddDays(-6);
+
+    var allTasks = await Db.TodoTasks.Where(t => t.UserId == userId).ToListAsync();
+    var totalTasks = allTasks.Count;
+    var completedTasks = allTasks.Count(t => t.Status == TodoTaskStatus.Completed);
+    var completionRate = totalTasks > 0 ? (int)((double)completedTasks / totalTasks * 100) : 0;
+
+    var thisWeekCompleted = allTasks.Count(t => t.CompletedAt?.Date >= weekStart);
+    var lastWeekCompleted = allTasks.Count(t => t.CompletedAt?.Date >= weekStart.AddDays(-7) && t.CompletedAt?.Date < weekStart);
+    var trend = thisWeekCompleted - lastWeekCompleted;
+
+    var byCategory = allTasks
+        .Where(t => t.CategoryId != null)
+        .GroupBy(t => t.CategoryId)
+        .Select(g => new { CategoryId = g.Key, Total = g.Count(), Completed = g.Count(t => t.Status == TodoTaskStatus.Completed) })
+        .ToList();
+
+    var categories = await Db.Categories.Where(c => c.UserId == userId).ToDictionaryAsync(c => c.Id, c => c);
+
+    var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).ToListAsync();
+    var habitEntries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date >= weekStart).ToListAsync();
+    var habitsTotal = habits.Count * 7;
+    var habitsCompleted = habitEntries.Count(e => e.IsCompleted);
+    var habitRate = habitsTotal > 0 ? (int)((double)habitsCompleted / habitsTotal * 100) : 0;
+
+    var studySessions = await Db.StudySessions.Where(s => s.UserId == userId && s.StartTime >= weekStart).ToListAsync();
+    var totalStudyMin = studySessions.Sum(s => s.DurationMinutes);
+    var avgDailyStudy = totalStudyMin / 7;
+
+    // Daily completions for the week
+    var dailyCompletions = Enumerable.Range(0, 7).Select(i => {
+        var d = weekStart.AddDays(i);
+        return new { Day = d.ToString("ddd"), Count = allTasks.Count(t => t.CompletedAt?.Date == d) };
+    }).ToList();
+
+    var maxDaily = dailyCompletions.Max(d => d.Count);
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📊 Analytics</h1>
+            <p class="section-subtitle">Weekly performance overview</p>
+        </div>
+    </div>
+
+    <!-- TOP STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Completion Rate</span>
+                <span class="stat-value">@completionRate%</span>
+                <span class="text-xs text-secondary">@completedTasks of @totalTasks tasks</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">This Week</span>
+                <span class="stat-value">@thisWeekCompleted</span>
+                <span class="text-xs @(trend >= 0 ? "text-secondary" : "")" style="@(trend > 0 ? "color: var(--color-success-text)" : trend < 0 ? "color: var(--color-danger-text)" : "")">
+                    @(trend > 0 ? $"↑ {trend}" : trend < 0 ? $"↓ {-trend}" : "→ Same") vs last week
+                </span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Habit Rate</span>
+                <span class="stat-value">@habitRate%</span>
+                <div class="progress-bar mt-2"><div class="progress-bar-fill @(habitRate >= 80 ? "success" : "")" style="width: @habitRate%"></div></div>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Study (avg/day)</span>
+                <span class="stat-value">@avgDailyStudy min</span>
+                <span class="text-xs text-secondary">@totalStudyMin min total</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="widget-grid">
+        <!-- DAILY CHART -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header"><span class="card-title">📈 Daily Task Completions (This Week)</span></div>
+            <div class="card-body">
+                <div style="display: flex; align-items: flex-end; gap: var(--space-3); height: 180px; padding: var(--space-4) 0;">
+                    @foreach (var day in dailyCompletions)
+                    {
+                        var height = maxDaily > 0 ? (int)((double)day.Count / maxDaily * 140) : 0;
+                        var isToday = day.Day == today.ToString("ddd");
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--space-1);">
+                            <span class="text-xs font-semibold">@day.Count</span>
+                            <div style="width: 100%; max-width: 48px; height: @(Math.Max(height, 4))px; background: @(isToday ? "var(--color-primary)" : "var(--color-primary-subtle)"); border-radius: var(--radius-sm) var(--radius-sm) 0 0; transition: height 0.3s ease;"></div>
+                            <span class="text-xs text-tertiary" style="@(isToday ? "color: var(--color-primary-text); font-weight: var(--weight-semibold);" : "")">@day.Day</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- BY CATEGORY -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">📊 By Category</span></div>
+            <div class="card-body">
+                @foreach (var cat in byCategory.OrderByDescending(c => c.Total).Take(8))
+                {
+                    var c = categories.GetValueOrDefault(cat.CategoryId!.Value);
+                    var pct = cat.Total > 0 ? (int)((double)cat.Completed / cat.Total * 100) : 0;
+                    if (c != null)
+                    {
+                        <div style="padding: var(--space-2) 0;">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm">@c.Icon @c.Name</span>
+                                <span class="text-xs text-secondary">@cat.Completed/@cat.Total (@pct%)</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-bar-fill" style="width: @pct%; background: @c.Color"></div></div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- PRIORITY DISTRIBUTION -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🎯 Priority Distribution</span></div>
+            <div class="card-body">
+                @{
+                    var byPriority = allTasks.Where(t => t.Status != TodoTaskStatus.Completed)
+                        .GroupBy(t => t.Priority)
+                        .OrderByDescending(g => g.Key)
+                        .Select(g => new { Priority = g.Key, Count = g.Count() }).ToList();
+                }
+                @foreach (var p in byPriority)
+                {
+                    var color = p.Priority switch { Priority.Critical => "var(--priority-critical)", Priority.High => "var(--priority-high)", Priority.Medium => "var(--priority-medium)", _ => "var(--priority-low)" };
+                    var maxCount = byPriority.Max(x => x.Count);
+                    var barWidth = maxCount > 0 ? (int)((double)p.Count / maxCount * 100) : 0;
+                    <div style="padding: var(--space-2) 0;">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <div class="priority-dot" style="background: @color;"></div>
+                                <span class="text-sm">@p.Priority</span>
+                            </div>
+                            <span class="text-sm font-semibold">@p.Count</span>
+                        </div>
+                        <div class="progress-bar"><div class="progress-bar-fill" style="width: @barWidth%; background: @color;"></div></div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

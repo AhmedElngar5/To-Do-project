@@ -1,0 +1,180 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.ProjectsModel
+@{
+    ViewData["Title"] = "Projects";
+    var userId = UserManager.GetUserId(User);
+    var projects = await Db.Projects
+        .Where(p => p.UserId == userId)
+        .Include(p => p.Category)
+        .Include(p => p.Tasks)
+        .Include(p => p.Milestones)
+        .OrderByDescending(p => p.Status == ProjectStatus.Active)
+        .ThenByDescending(p => p.Priority)
+        .ToListAsync();
+    var categories = await Db.Categories.Where(c => c.UserId == userId).OrderBy(c => c.SortOrder).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🚀 Projects</h1>
+            <p class="section-subtitle">@projects.Count project@(projects.Count != 1 ? "s" : "")</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('createProjectModal').classList.add('active')">+ New Project</button>
+    </div>
+
+    @if (projects.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">🚀</div>
+            <div class="empty-state-title">No projects yet</div>
+            <div class="empty-state-text">Create a project to start tracking progress.</div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-grid">
+            @foreach (var project in projects)
+            {
+                var activeTasks = project.Tasks.Count(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && !t.IsDeleted);
+                var completedTasks = project.Tasks.Count(t => t.Status == TodoTaskStatus.Completed && !t.IsDeleted);
+                var totalTasks = activeTasks + completedTasks;
+                var taskProgress = totalTasks > 0 ? (int)((double)completedTasks / totalTasks * 100) : project.Progress;
+                var healthBadge = project.Health switch {
+                    ProjectHealth.Healthy => "badge-success",
+                    ProjectHealth.NeedsAttention => "badge-warning",
+                    ProjectHealth.AtRisk => "badge-danger",
+                    _ => "badge-danger"
+                };
+                var statusBadge = project.Status switch {
+                    ProjectStatus.Active => "badge-success",
+                    ProjectStatus.Planning => "badge-info",
+                    ProjectStatus.OnHold => "badge-warning",
+                    ProjectStatus.Completed => "badge-neutral",
+                    _ => "badge-neutral"
+                };
+                <div class="card">
+                    <div class="card-header">
+                        <div class="flex items-center gap-2">
+                            <span style="font-size: var(--text-lg);">@(project.Icon ?? "📁")</span>
+                            <span class="card-title">@project.Name</span>
+                        </div>
+                        <span class="badge @statusBadge">@project.Status</span>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(project.Description))
+                        {
+                            <p class="text-sm text-secondary mb-4" style="line-height: 1.5;">@project.Description</p>
+                        }
+
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-secondary">Progress</span>
+                            <span class="text-sm font-semibold">@taskProgress%</span>
+                        </div>
+                        <div class="progress-bar mb-4">
+                            <div class="progress-bar-fill" style="width: @taskProgress%; background: @(project.Color ?? "var(--color-primary)")"></div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); margin-bottom: var(--space-3);">
+                            <div style="text-align: center;">
+                                <div style="font-size: var(--text-xl); font-weight: var(--weight-bold);">@activeTasks</div>
+                                <div class="text-xs text-secondary">Active</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: var(--text-xl); font-weight: var(--weight-bold);">@completedTasks</div>
+                                <div class="text-xs text-secondary">Done</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: var(--text-xl); font-weight: var(--weight-bold);">@project.Milestones.Count</div>
+                                <div class="text-xs text-secondary">Milestones</div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge @healthBadge">@project.Health</span>
+                            @if (project.Deadline != null)
+                            {
+                                var d = (project.Deadline.Value.Date - DateTime.UtcNow.Date).Days;
+                                <span class="badge @(d < 7 ? "badge-warning" : "badge-neutral")">📅 @(d < 0 ? "Overdue" : $"{d}d left")</span>
+                            }
+                            @if (!string.IsNullOrEmpty(project.Technologies))
+                            {
+                                @foreach (var tech in project.Technologies.Split(',').Take(3))
+                                {
+                                    <span class="badge badge-neutral">@tech.Trim()</span>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- CREATE PROJECT MODAL -->
+<div class="modal-backdrop" id="createProjectModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">New Project</span>
+            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createProjectModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateProject">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" name="Name" required placeholder="Project name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="Description" rows="3" placeholder="What is this project about?"></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="Type">
+                            @foreach (ProjectType pt in Enum.GetValues<ProjectType>())
+                            {
+                                <option value="@((int)pt)">@pt</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select name="Priority">
+                            <option value="1">Medium</option>
+                            <option value="2">High</option>
+                            <option value="3">Critical</option>
+                            <option value="0">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" name="StartDate" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Deadline</label>
+                        <input type="date" name="Deadline" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Technologies</label>
+                    <input type="text" name="Technologies" placeholder="C#, ASP.NET Core, SQL Server" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createProjectModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Project</button>
+            </div>
+        </form>
+    </div>
+</div>

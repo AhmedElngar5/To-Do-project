@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Ahmed OS</title>
+    <meta name="description" content="Ahmed OS — Personal Operating System for life, study, career & productivity" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' font-family='sans-serif' font-size='55' font-weight='bold' fill='white' text-anchor='middle'>A</text></svg>" />
+</head>
+<body>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="app-container" id="app">
+            <!-- SIDEBAR -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <a href="/" class="sidebar-logo">
+                        <div class="logo-icon">A</div>
+                        <span>Ahmed OS</span>
+                    </a>
+                </div>
+                <nav class="sidebar-nav" id="sidebarNav">
+                    <div class="nav-section">
+                        <a href="/" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Index" ? "active" : "")" data-page="home">
+                            <span class="nav-icon">🏠</span> Home
+                        </a>
+                        <a href="/Today" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Today" ? "active" : "")" data-page="today">
+                            <span class="nav-icon">📌</span> Today
+                            <span class="nav-badge" id="todayBadge"></span>
+                        </a>
+                        <a href="/Inbox" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Inbox" ? "active" : "")" data-page="inbox">
+                            <span class="nav-icon">📥</span> Inbox
+                            <span class="nav-badge" id="inboxBadge"></span>
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Productivity</div>
+                        <a href="/Tasks" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Tasks" ? "active" : "")" data-page="tasks">
+                            <span class="nav-icon">✅</span> Tasks
+                        </a>
+                        <a href="/Planner" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Planner" ? "active" : "")" data-page="planner">
+                            <span class="nav-icon">📋</span> Planner
+                        </a>
+                        <a href="/Calendar" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Calendar" ? "active" : "")" data-page="calendar">
+                            <span class="nav-icon">📅</span> Calendar
+                        </a>
+                        <a href="/Focus" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Focus" ? "active" : "")" data-page="focus">
+                            <span class="nav-icon">🎯</span> Focus
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Work</div>
+                        <a href="/Projects" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Projects" ? "active" : "")" data-page="projects">
+                            <span class="nav-icon">🚀</span> Projects
+                        </a>
+                        <a href="/Goals" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Goals" ? "active" : "")" data-page="goals">
+                            <span class="nav-icon">🎯</span> Goals
+                        </a>
+                        <a href="/Habits" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Habits" ? "active" : "")" data-page="habits">
+                            <span class="nav-icon">🔄</span> Habits
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Learning</div>
+                        <a href="/Study" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Study" ? "active" : "")" data-page="study">
+                            <span class="nav-icon">📚</span> Study
+                        </a>
+                        <a href="/University" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/University" ? "active" : "")" data-page="university">
+                            <span class="nav-icon">🎓</span> University
+                        </a>
+                        <a href="/DEPI" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/DEPI" ? "active" : "")" data-page="depi">
+                            <span class="nav-icon">📋</span> DEPI
+                        </a>
+                        <a href="/Skills" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Skills" ? "active" : "")" data-page="skills">
+                            <span class="nav-icon">⚡</span> Skills
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Career</div>
+                        <a href="/Career" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Career" ? "active" : "")" data-page="career">
+                            <span class="nav-icon">💼</span> Career
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Other</div>
+                        <a href="/Notes" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Notes" ? "active" : "")" data-page="notes">
+                            <span class="nav-icon">📝</span> Notes
+                        </a>
+                        <a href="/Analytics" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Analytics" ? "active" : "")" data-page="analytics">
+                            <span class="nav-icon">📊</span> Analytics
+                        </a>
+                        <a href="/Reviews" class="nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Reviews" ? "active" : "")" data-page="reviews">
+                            <span class="nav-icon">🔍</span> Reviews
+                        </a>
+                    </div>
+                </nav>
+
+                <!-- Sidebar footer -->
+                <div style="padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-secondary); flex-shrink: 0;">
+                    <a href="/Settings" class="nav-item" data-page="settings">
+                        <span class="nav-icon">⚙️</span> Settings
+                    </a>
+                </div>
+            </aside>
+
+            <!-- MAIN -->
+            <div class="main-content">
+                <!-- TOPBAR -->
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <button class="mobile-nav-toggle topbar-btn" id="menuToggle" aria-label="Toggle navigation">
+                            ☰
+                        </button>
+                    </div>
+                    <div class="topbar-center">
+                        <button class="search-trigger" id="searchTrigger" aria-label="Search">
+                            🔍 <span>Search anything...</span> <kbd>⌘K</kbd>
+                        </button>
+                    </div>
+                    <div class="topbar-right">
+                        <button class="topbar-btn" id="quickCaptureBtn" aria-label="Quick capture" title="Quick capture (Ctrl+Shift+A)">
+                            ✚
+                        </button>
+                        <button class="topbar-btn" id="notificationsBtn" aria-label="Notifications">
+                            🔔 <span class="badge-dot"></span>
+                        </button>
+                        <button class="topbar-btn" id="themeToggle" aria-label="Toggle theme" title="Toggle dark/light mode">
+                            🌙
+                        </button>
+                        <form method="post" asp-page="/Account/Logout" asp-area="Identity" style="margin:0">
+                            <button type="submit" class="topbar-btn" title="Sign out" aria-label="Sign out">👤</button>
+                        </form>
+                    </div>
+                </header>
+
+                <!-- PAGE -->
+                <main class="page-content" id="pageContent">
+                    @RenderBody()
+                </main>
+            </div>
+
+            <!-- Mobile bottom nav -->
+            <nav class="mobile-bottom-nav">
+                <a href="/" class="mobile-nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Index" ? "active" : "")">
+                    <span class="mobile-nav-icon">🏠</span> Home
+                </a>
+                <a href="/Today" class="mobile-nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Today" ? "active" : "")">
+                    <span class="mobile-nav-icon">📌</span> Today
+                </a>
+                <a href="/Tasks" class="mobile-nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Tasks" ? "active" : "")">
+                    <span class="mobile-nav-icon">✅</span> Tasks
+                </a>
+                <a href="/Calendar" class="mobile-nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Calendar" ? "active" : "")">
+                    <span class="mobile-nav-icon">📅</span> Calendar
+                </a>
+                <a href="/Projects" class="mobile-nav-item @(ViewContext.RouteData.Values["page"]?.ToString() == "/Projects" ? "active" : "")">
+                    <span class="mobile-nav-icon">🚀</span> Projects
+                </a>
+            </nav>
+
+            <!-- FAB -->
+            <button class="fab" id="fabBtn" aria-label="Quick add">+</button>
+
+            <!-- COMMAND PALETTE -->
+            <div class="command-palette" id="commandPalette">
+                <div class="command-palette-inner">
+                    <input type="text" class="command-palette-input" id="commandInput" placeholder="Type a command or search..." autocomplete="off" />
+                    <div class="command-results" id="commandResults">
+                        <div class="command-item" data-action="newTask"><span class="command-item-icon">✚</span> New Task <span class="command-item-shortcut">N</span></div>
+                        <div class="command-item" data-action="newNote"><span class="command-item-icon">📝</span> New Note</div>
+                        <div class="command-item" data-action="newProject"><span class="command-item-icon">🚀</span> New Project</div>
+                        <div class="command-item" data-action="newGoal"><span class="command-item-icon">🎯</span> New Goal</div>
+                        <div class="command-item" data-action="newHabit"><span class="command-item-icon">🔄</span> New Habit</div>
+                        <div class="command-item" data-action="startFocus"><span class="command-item-icon">⏱️</span> Start Focus Session</div>
+                        <div class="command-item" data-action="openToday"><span class="command-item-icon">📌</span> Open Today</div>
+                        <div class="command-item" data-action="openCalendar"><span class="command-item-icon">📅</span> Open Calendar</div>
+                        <div class="command-item" data-action="planDay"><span class="command-item-icon">📋</span> Plan My Day</div>
+                        <div class="command-item" data-action="reviewDay"><span class="command-item-icon">🔍</span> Review Day</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TOAST CONTAINER -->
+            <div class="toast-container" id="toastContainer"></div>
+        </div>
+    }
+    else
+    {
+        @RenderBody()
+    }
+
+    <script src="~/js/site.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

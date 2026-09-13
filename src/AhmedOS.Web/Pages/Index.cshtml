@@ -1,0 +1,371 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var tomorrow = today.AddDays(1);
+    var weekEnd = today.AddDays(7);
+
+    // Fetch data
+    var allTasks = await Db.TodoTasks
+        .Where(t => t.UserId == userId)
+        .Include(t => t.Category)
+        .Include(t => t.Project)
+        .ToListAsync();
+
+    var todayTasks = allTasks.Where(t => t.DueDate?.Date == today && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).ToList();
+    var overdueTasks = allTasks.Where(t => t.DueDate < today && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).ToList();
+    var upcomingDeadlines = allTasks
+        .Where(t => t.DueDate >= today && t.DueDate <= weekEnd && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled)
+        .OrderBy(t => t.DueDate).Take(5).ToList();
+    var completedToday = allTasks.Count(t => t.CompletedAt?.Date == today);
+    var totalTodayItems = todayTasks.Count + overdueTasks.Count;
+    var todayProgress = totalTodayItems > 0 ? (int)((double)completedToday / (completedToday + totalTodayItems) * 100) : 0;
+
+    // Top 3 priorities (highest priority tasks due soonest)
+    var top3 = allTasks
+        .Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled)
+        .OrderByDescending(t => t.Priority)
+        .ThenBy(t => t.DueDate ?? DateTime.MaxValue)
+        .Take(3).ToList();
+
+    // Next action
+    var nextAction = top3.FirstOrDefault();
+
+    // Projects
+    var projects = await Db.Projects.Where(p => p.UserId == userId && p.Status == ProjectStatus.Active).ToListAsync();
+
+    // Goals
+    var goals = await Db.Goals.Where(g => g.UserId == userId && g.Level == GoalLevel.Yearly && g.Status != GoalStatus.Completed).ToListAsync();
+
+    // Habits today
+    var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).ToListAsync();
+    var todayEntries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date.Date == today).ToListAsync();
+    var habitsCompleted = todayEntries.Count(e => e.IsCompleted);
+    var habitsTotal = habits.Count;
+
+    // Study topics
+    var studyTopics = await Db.StudyTopics.Where(s => s.UserId == userId).OrderByDescending(s => s.Progress).Take(6).ToListAsync();
+
+    // Skills for roadmap
+    var skills = await Db.Skills.Where(s => s.UserId == userId).OrderBy(s => s.SortOrder).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <!-- GREETING -->
+    <div class="greeting">
+        <h1 class="greeting-text" id="greetingText">Good morning, Ahmed</h1>
+        <p class="greeting-sub" id="currentTime"></p>
+    </div>
+
+    <!-- TOP STATS ROW -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Today's Progress</span>
+                <span class="stat-value">@todayProgress%</span>
+                <div class="progress-bar" style="margin-top: 4px;">
+                    <div class="progress-bar-fill @(todayProgress >= 80 ? "success" : todayProgress >= 50 ? "" : "warning")" style="width: @todayProgress%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Tasks Today</span>
+                <span class="stat-value">@totalTodayItems</span>
+                <span class="text-xs text-secondary">@completedToday completed</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Overdue</span>
+                <span class="stat-value" style="color: @(overdueTasks.Count > 0 ? "var(--color-danger-text)" : "var(--text-primary)")">@overdueTasks.Count</span>
+                <span class="text-xs text-secondary">@(overdueTasks.Count == 0 ? "You're clear" : "need attention")</span>
+            </div>
+        </div>
+        <div class="card card-compact">
+            <div class="card-body stat-widget">
+                <span class="stat-label">Habits</span>
+                <span class="stat-value">@habitsCompleted/@habitsTotal</span>
+                <div class="progress-bar" style="margin-top: 4px;">
+                    <div class="progress-bar-fill success" style="width: @(habitsTotal > 0 ? (int)((double)habitsCompleted / habitsTotal * 100) : 0)%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="widget-grid">
+        <!-- NEXT ACTION -->
+        @if (nextAction != null)
+        {
+            <div class="card" style="grid-column: 1 / -1; border-left: 3px solid var(--color-primary);">
+                <div class="card-body" style="display: flex; align-items: center; gap: var(--space-4); padding: var(--space-5);">
+                    <div style="flex: 1;">
+                        <span class="badge badge-primary" style="margin-bottom: var(--space-2);">DO NOW</span>
+                        <h3 style="font-size: var(--text-xl); font-weight: var(--weight-semibold); margin-top: var(--space-2);">@nextAction.Title</h3>
+                        <div class="flex items-center gap-2 mt-2">
+                            @if (nextAction.Category != null)
+                            {
+                                <span class="badge badge-neutral">@nextAction.Category.Name</span>
+                            }
+                            @if (nextAction.DueDate != null)
+                            {
+                                var daysUntil = (nextAction.DueDate.Value.Date - today).Days;
+                                <span class="task-meta-item @(daysUntil < 0 ? "overdue" : daysUntil == 0 ? "today" : "")">
+                                    📅 @(daysUntil < 0 ? $"Overdue by {-daysUntil}d" : daysUntil == 0 ? "Due today" : $"Due in {daysUntil}d")
+                                </span>
+                            }
+                            @if (nextAction.EstimatedMinutes != null)
+                            {
+                                <span class="task-meta-item">⏱️ @nextAction.EstimatedMinutes min</span>
+                            }
+                        </div>
+                        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-2);">
+                            Recommended because: @(nextAction.Priority == Priority.Critical ? "Critical priority" : "High priority")
+                            @(nextAction.DueDate?.Date == today ? " + due today" : nextAction.DueDate?.Date == tomorrow ? " + due tomorrow" : "")
+                            @(nextAction.Project != null ? $" + linked to {nextAction.Project.Name}" : "")
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: var(--space-2); flex-shrink: 0;">
+                        <a href="/Focus" class="btn btn-primary">▶ Start</a>
+                        <a href="/Tasks" class="btn btn-secondary">View All</a>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- TOP 3 PRIORITIES -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🎯 Top 3 Priorities</span>
+                <a href="/Today" class="btn btn-ghost btn-sm">View Today →</a>
+            </div>
+            <div class="card-body">
+                @if (top3.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">✨</div>
+                        <div class="empty-state-title">All clear</div>
+                        <div class="empty-state-text">No pending priorities. Create a task to get started.</div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var task in top3)
+                    {
+                        var priorityClass = task.Priority switch {
+                            Priority.Critical => "priority-critical",
+                            Priority.High => "priority-high",
+                            Priority.Medium => "priority-medium",
+                            _ => "priority-low"
+                        };
+                        <div class="task-item">
+                            <div class="task-checkbox @priorityClass" data-task-id="@task.Id"></div>
+                            <div class="task-content">
+                                <div class="task-title">@task.Title</div>
+                                <div class="task-meta">
+                                    @if (task.DueDate != null)
+                                    {
+                                        var days = (task.DueDate.Value.Date - today).Days;
+                                        <span class="task-meta-item @(days < 0 ? "overdue" : days == 0 ? "today" : "")">
+                                            📅 @(days < 0 ? "Overdue" : days == 0 ? "Today" : days == 1 ? "Tomorrow" : $"In {days}d")
+                                        </span>
+                                    }
+                                    @if (task.Category != null)
+                                    {
+                                        <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- UPCOMING DEADLINES -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">⏰ Upcoming Deadlines</span>
+            </div>
+            <div class="card-body">
+                @if (upcomingDeadlines.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">🎉</div>
+                        <div class="empty-state-title">No upcoming deadlines</div>
+                        <div class="empty-state-text">Your next 7 days are clear.</div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var task in upcomingDeadlines)
+                    {
+                        var daysLeft = (task.DueDate!.Value.Date - today).Days;
+                        var urgencyClass = daysLeft <= 0 ? "badge-danger" : daysLeft <= 1 ? "badge-warning" : daysLeft <= 3 ? "badge-info" : "badge-neutral";
+                        <div class="deadline-item">
+                            <span class="badge @urgencyClass deadline-days">
+                                @(daysLeft <= 0 ? "Today" : daysLeft == 1 ? "1d" : $"{daysLeft}d")
+                            </span>
+                            <span class="deadline-title">@task.Title</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- OVERDUE ITEMS -->
+        @if (overdueTasks.Count > 0)
+        {
+            <div class="card" style="border-color: var(--color-danger-subtle);">
+                <div class="card-header" style="border-color: var(--color-danger-subtle);">
+                    <span class="card-title" style="color: var(--color-danger-text);">⚠️ Overdue (@overdueTasks.Count)</span>
+                </div>
+                <div class="card-body">
+                    @foreach (var task in overdueTasks.Take(5))
+                    {
+                        var daysOverdue = (today - task.DueDate!.Value.Date).Days;
+                        <div class="task-item">
+                            <div class="task-checkbox priority-critical" data-task-id="@task.Id"></div>
+                            <div class="task-content">
+                                <div class="task-title">@task.Title</div>
+                                <div class="task-meta">
+                                    <span class="task-meta-item overdue">@daysOverdue day@(daysOverdue != 1 ? "s" : "") overdue</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- ACTIVE PROJECTS -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🚀 Active Projects</span>
+                <a href="/Projects" class="btn btn-ghost btn-sm">All →</a>
+            </div>
+            <div class="card-body">
+                @if (projects.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">🚀</div>
+                        <div class="empty-state-title">No active projects</div>
+                        <div class="empty-state-text">Create a project to start tracking progress.</div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var project in projects)
+                    {
+                        <div style="padding: var(--space-2) 0;">
+                            <div class="flex items-center justify-between mb-2">
+                                <span style="font-size: var(--text-md); font-weight: var(--weight-medium);">
+                                    @(project.Icon ?? "📁") @project.Name
+                                </span>
+                                <span class="text-xs text-secondary">@project.Progress%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" style="width: @project.Progress%; background: @(project.Color ?? "var(--color-primary)")"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- HABITS TODAY -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🔄 Today's Habits</span>
+                <span class="text-sm text-secondary">@habitsCompleted / @habitsTotal</span>
+            </div>
+            <div class="card-body">
+                @foreach (var habit in habits)
+                {
+                    var isDone = todayEntries.Any(e => e.HabitId == habit.Id && e.IsCompleted);
+                    <div class="habit-row">
+                        <span class="habit-icon">@habit.Icon</span>
+                        <span class="habit-name">@habit.Name</span>
+                        <div class="habit-check @(isDone ? "done" : "")" data-habit-id="@habit.Id"></div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- GOALS -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🎯 Goals</span>
+                <a href="/Goals" class="btn btn-ghost btn-sm">All →</a>
+            </div>
+            <div class="card-body">
+                @foreach (var goal in goals.Take(5))
+                {
+                    var statusBadge = goal.Status switch {
+                        GoalStatus.OnTrack => "badge-success",
+                        GoalStatus.AtRisk => "badge-warning",
+                        GoalStatus.Behind => "badge-danger",
+                        _ => "badge-neutral"
+                    };
+                    <div style="padding: var(--space-2) 0;">
+                        <div class="flex items-center justify-between mb-2">
+                            <span style="font-size: var(--text-sm); font-weight: var(--weight-medium);">@goal.Title</span>
+                            <span class="badge @statusBadge">@goal.Status</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill @(goal.Status == GoalStatus.OnTrack ? "success" : goal.Status == GoalStatus.AtRisk ? "warning" : "danger")" style="width: @goal.Progress%"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- STUDY PROGRESS -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📚 Study Progress</span>
+                <a href="/Study" class="btn btn-ghost btn-sm">All →</a>
+            </div>
+            <div class="card-body">
+                @foreach (var topic in studyTopics)
+                {
+                    <div class="skill-item">
+                        <span class="skill-name">@(topic.Icon ?? "📗") @topic.Name</span>
+                        <div class="skill-bar-wrap">
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" style="width: @topic.Progress%"></div>
+                            </div>
+                        </div>
+                        <span class="skill-percent">@topic.Progress%</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- SKILL ROADMAP PREVIEW -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">⚡ Career Roadmap — Full Stack .NET Developer</span>
+                <a href="/Skills" class="btn btn-ghost btn-sm">Full Roadmap →</a>
+            </div>
+            <div class="card-body" style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+                @foreach (var skill in skills)
+                {
+                    var bg = skill.Progress >= 60 ? "var(--color-success-subtle)" : skill.Progress >= 30 ? "var(--color-primary-subtle)" : "var(--bg-hover)";
+                    var color = skill.Progress >= 60 ? "var(--color-success-text)" : skill.Progress >= 30 ? "var(--color-primary-text)" : "var(--text-secondary)";
+                    <div style="padding: var(--space-2) var(--space-3); background: @bg; border-radius: var(--radius-full); font-size: var(--text-sm); color: @color; font-weight: var(--weight-medium);">
+                        @skill.Name <span style="opacity: 0.7;">@skill.Progress%</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,162 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.TasksModel
+@{
+    ViewData["Title"] = "Tasks";
+    var userId = UserManager.GetUserId(User);
+    var filter = HttpContext.Request.Query["filter"].FirstOrDefault() ?? "all";
+    var today = DateTime.UtcNow.Date;
+
+    var query = Db.TodoTasks
+        .Where(t => t.UserId == userId)
+        .Include(t => t.Category).Include(t => t.Project);
+
+    var tasks = filter switch
+    {
+        "today" => await query.Where(t => t.DueDate != null && t.DueDate.Value.Date == today && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.Priority).ToListAsync(),
+        "overdue" => await query.Where(t => t.DueDate < today && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).OrderBy(t => t.DueDate).ToListAsync(),
+        "high" => await query.Where(t => (t.Priority == Priority.High || t.Priority == Priority.Critical) && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate).ToListAsync(),
+        "completed" => await query.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.CompletedAt).Take(50).ToListAsync(),
+        "inbox" => await query.Where(t => t.Status == TodoTaskStatus.Inbox).OrderByDescending(t => t.CreatedAt).ToListAsync(),
+        _ => await query.Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.Status != TodoTaskStatus.Archived).OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate ?? DateTime.MaxValue).ToListAsync()
+    };
+
+    var categories = await Db.Categories.Where(c => c.UserId == userId).OrderBy(c => c.SortOrder).ToListAsync();
+    var projects = await Db.Projects.Where(p => p.UserId == userId).OrderBy(p => p.Name).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">✅ Tasks</h1>
+            <p class="section-subtitle">@tasks.Count task@(tasks.Count != 1 ? "s" : "")</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('createTaskModal').classList.add('active')">+ New Task</button>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="tabs">
+        <a href="/Tasks" class="tab @(filter == "all" ? "active" : "")">All</a>
+        <a href="/Tasks?filter=today" class="tab @(filter == "today" ? "active" : "")">Today</a>
+        <a href="/Tasks?filter=overdue" class="tab @(filter == "overdue" ? "active" : "")">Overdue</a>
+        <a href="/Tasks?filter=high" class="tab @(filter == "high" ? "active" : "")">High Priority</a>
+        <a href="/Tasks?filter=inbox" class="tab @(filter == "inbox" ? "active" : "")">Inbox</a>
+        <a href="/Tasks?filter=completed" class="tab @(filter == "completed" ? "active" : "")">Completed</a>
+    </div>
+
+    <!-- TASK LIST -->
+    @if (tasks.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">@(filter == "completed" ? "🎉" : filter == "overdue" ? "✨" : "📝")</div>
+            <div class="empty-state-title">@(filter switch { "completed" => "No completed tasks yet", "overdue" => "No overdue tasks!", "today" => "Nothing scheduled for today", "inbox" => "Inbox is empty", _ => "No tasks found" })</div>
+            <div class="empty-state-text">@(filter switch { "overdue" => "Great work — you're all caught up.", "inbox" => "Capture a task to get started.", _ => "Create a new task to begin tracking your work." })</div>
+        </div>
+    }
+    else
+    {
+        <div style="background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg);">
+            @foreach (var task in tasks)
+            {
+                var priorityClass = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", Priority.Medium => "priority-medium", _ => "priority-low" };
+                var isCompleted = task.Status == TodoTaskStatus.Completed;
+                <div class="task-item" style="border-bottom: 1px solid var(--border-secondary);">
+                    <div class="task-checkbox @(isCompleted ? "checked" : priorityClass)" data-task-id="@task.Id"></div>
+                    <div class="task-content">
+                        <div class="task-title @(isCompleted ? "completed" : "")">@task.Title</div>
+                        <div class="task-meta">
+                            @if (task.DueDate != null)
+                            {
+                                var d = (task.DueDate.Value.Date - today).Days;
+                                <span class="task-meta-item @(d < 0 ? "overdue" : d == 0 ? "today" : "")">
+                                    📅 @(d < 0 ? $"{-d}d overdue" : d == 0 ? "Today" : d == 1 ? "Tomorrow" : task.DueDate.Value.ToString("MMM d"))
+                                </span>
+                            }
+                            @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
+                            @if (task.Project != null) { <span class="task-meta-item">🚀 @task.Project.Name</span> }
+                            @if (task.EstimatedMinutes != null) { <span class="task-meta-item">⏱️ @task.EstimatedMinutes min</span> }
+                            <span class="badge @(task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", Priority.Medium => "badge-info", _ => "badge-neutral" })">@task.Priority</span>
+                            @if (task.Status != TodoTaskStatus.Inbox && task.Status != TodoTaskStatus.Completed)
+                            {
+                                <span class="badge badge-neutral">@task.Status</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- CREATE TASK MODAL -->
+<div class="modal-backdrop" id="createTaskModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">New Task</span>
+            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createTaskModal').classList.remove('active')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="CreateTask">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" name="Title" required placeholder="What needs to be done?" autofocus />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="Description" rows="3" placeholder="Add details..."></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select name="Priority">
+                            <option value="1">Medium</option>
+                            <option value="3">Critical</option>
+                            <option value="2">High</option>
+                            <option value="0">Low</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date</label>
+                        <input type="date" name="DueDate" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select name="CategoryId">
+                            <option value="">None</option>
+                            @foreach (var cat in categories)
+                            {
+                                <option value="@cat.Id">@cat.Icon @cat.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Project</label>
+                        <select name="ProjectId">
+                            <option value="">None</option>
+                            @foreach (var proj in projects)
+                            {
+                                <option value="@proj.Id">@(proj.Icon ?? "📁") @proj.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estimated Duration (minutes)</label>
+                    <input type="number" name="EstimatedMinutes" placeholder="30" min="5" step="5" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('createTaskModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Task</button>
+            </div>
+        </form>
+    </div>
+</div>

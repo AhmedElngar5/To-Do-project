@@ -1,0 +1,72 @@
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@model AhmedOS.Web.Pages.InboxModel
+@{
+    ViewData["Title"] = "Inbox";
+    var userId = UserManager.GetUserId(User);
+    var inboxTasks = await Db.TodoTasks
+        .Where(t => t.UserId == userId && t.Status == TodoTaskStatus.Inbox)
+        .OrderByDescending(t => t.CreatedAt)
+        .Include(t => t.Category)
+        .ToListAsync();
+    var categories = await Db.Categories.Where(c => c.UserId == userId).OrderBy(c => c.SortOrder).ToListAsync();
+}
+
+<div class="animate-fade-in">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📥 Inbox</h1>
+            <p class="section-subtitle">@inboxTasks.Count item@(inboxTasks.Count != 1 ? "s" : "") to process</p>
+        </div>
+    </div>
+
+    <!-- QUICK CAPTURE -->
+    <div class="card mb-4" style="border-left: 3px solid var(--color-primary);">
+        <form method="post" asp-page-handler="QuickCapture">
+            @Html.AntiForgeryToken()
+            <div class="card-body" style="display: flex; gap: var(--space-3); align-items: center;">
+                <input type="text" name="Title" placeholder="Quick capture — type anything and press Enter..." style="flex: 1; border: none; background: transparent; font-size: var(--text-lg); padding: var(--space-2);" required autofocus />
+                <button type="submit" class="btn btn-primary">Capture</button>
+            </div>
+        </form>
+    </div>
+
+    @if (inboxTasks.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">📥</div>
+            <div class="empty-state-title">Inbox is empty</div>
+            <div class="empty-state-text">Capture anything on your mind using the quick capture bar above, then process and organize it later.</div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Unprocessed Items</span>
+                <span class="text-sm text-secondary">Process: assign category, priority, and due date</span>
+            </div>
+            <div class="card-body">
+                @foreach (var task in inboxTasks)
+                {
+                    <div class="task-item" style="border-bottom: 1px solid var(--border-secondary);">
+                        <div class="task-checkbox" data-task-id="@task.Id"></div>
+                        <div class="task-content" style="flex: 1;">
+                            <div class="task-title">@task.Title</div>
+                            <div class="task-meta mt-2">
+                                <span class="task-meta-item">@task.CreatedAt.ToString("MMM d, h:mm tt")</span>
+                                @if (task.Category != null) { <span class="badge badge-neutral">@task.Category.Icon @task.Category.Name</span> }
+                            </div>
+                        </div>
+                        <a href="/Tasks" class="btn btn-ghost btn-sm">Process →</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
