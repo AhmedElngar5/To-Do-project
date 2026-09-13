@@ -52,9 +52,12 @@
     };
 
     // ============================================================
-    // COMMAND PALETTE
+    // COMMAND PALETTE & GLOBAL SEARCH
     // ============================================================
     const CommandPalette = {
+        debounceTimer: null,
+        defaultCommands: '',
+
         init() {
             this.el = document.getElementById('commandPalette');
             this.input = document.getElementById('commandInput');
@@ -63,9 +66,14 @@
 
             if (!this.el) return;
 
-            // Keyboard shortcut
+            // Cache original static commands
+            if (this.results) {
+                this.defaultCommands = this.results.innerHTML;
+            }
+
+            // Keyboard shortcut Ctrl+K / Cmd+K
             document.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
                     e.preventDefault();
                     this.toggle();
                 }
@@ -83,9 +91,19 @@
                 if (e.target === this.el) this.close();
             });
 
-            // Filter commands
+            // Filter commands & search API
             if (this.input) {
-                this.input.addEventListener('input', () => this.filter());
+                this.input.addEventListener('input', () => {
+                    const query = this.input.value.trim();
+                    this.filterStatic(query);
+
+                    clearTimeout(this.debounceTimer);
+                    if (query.length >= 2) {
+                        this.debounceTimer = setTimeout(() => this.searchApi(query), 200);
+                    } else if (query.length === 0) {
+                        this.results.innerHTML = this.defaultCommands;
+                    }
+                });
             }
 
             // Handle command clicks
@@ -93,7 +111,11 @@
                 this.results.addEventListener('click', (e) => {
                     const item = e.target.closest('.command-item');
                     if (item) {
-                        this.executeCommand(item.dataset.action);
+                        if (item.dataset.url) {
+                            window.location.href = item.dataset.url;
+                        } else if (item.dataset.action) {
+                            this.executeCommand(item.dataset.action);
+                        }
                         this.close();
                     }
                 });
@@ -106,19 +128,58 @@
         close() {
             this.el.classList.remove('active');
             if (this.input) this.input.value = '';
-            this.filter();
+            if (this.results && this.defaultCommands) {
+                this.results.innerHTML = this.defaultCommands;
+            }
         },
         toggle() {
             if (this.el.classList.contains('active')) this.close();
             else this.open();
         },
-        filter() {
-            const query = this.input?.value?.toLowerCase() || '';
+        filterStatic(query) {
+            if (!query) return;
+            const q = query.toLowerCase();
             const items = this.results?.querySelectorAll('.command-item') || [];
             items.forEach(item => {
                 const text = item.textContent.toLowerCase();
-                item.style.display = text.includes(query) ? '' : 'none';
+                item.style.display = text.includes(q) ? '' : 'none';
             });
+        },
+        async searchApi(query) {
+            try {
+                const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const results = data.results || [];
+
+                let html = `<div class="command-section-title">Actions</div>` + this.defaultCommands;
+                
+                if (results.length > 0) {
+                    html = `<div class="command-section-title">Search Results (${results.length})</div>`;
+                    results.forEach(r => {
+                        html += `
+                            <div class="command-item" data-url="${r.url}">
+                                <div class="command-item-left">
+                                    <span class="command-item-icon">${r.icon || '🔍'}</span>
+                                    <div>
+                                        <div class="command-item-title">${r.title}</div>
+                                        <div class="command-item-sub">${r.sub || ''}</div>
+                                    </div>
+                                </div>
+                                <span class="badge badge-neutral">${r.type}</span>
+                            </div>
+                        `;
+                    });
+                    html += `<div class="command-section-title" style="margin-top: 8px;">Quick Commands</div>` + this.defaultCommands;
+                }
+
+                if (this.results) {
+                    this.results.innerHTML = html;
+                    this.filterStatic(query);
+                }
+            } catch (err) {
+                console.error('Search API error:', err);
+            }
         },
         executeCommand(action) {
             const routes = {
@@ -302,13 +363,224 @@
     };
 
     // ============================================================
+    // NOTIFICATIONS CENTER
+    // ============================================================
+    const Notifications = {
+        init() {
+            const btn = document.getElementById('notificationsBtn');
+            const dropdown = document.getElementById('notificationDropdown');
+            const markAllBtn = document.getElementById('markAllReadBtn');
+            const list = document.getElementById('notificationList');
+
+            if (!btn || !dropdown) return;
+
+            // Toggle dropdown
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('active');
+                if (dropdown.classList.contains('active')) {
+                    this.load();
+                }
+            });
+
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && e.target !== btn) {
+                    dropdown.classList.remove('active');
+                }
+            });
+
+            // Mark all as read
+            if (markAllBtn) {
+                markAllBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const res = await fetch('/api/notifications/read-all', { method: 'POST' });
+                        if (res.ok) {
+                            Toast.show('All notifications marked as read', 'success');
+                            this.load();
+                            const dot = btn.querySelector('.badge-dot');
+                            if (dot) dot.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error('Error marking notifications as read:', err);
+                    }
+                });
+            }
+
+            // Initial check for unread count
+            this.checkUnread();
+        },
+        async checkUnread() {
+            try {
+                const res = await fetch('/api/notifications/unread-count');
+                if (!res.ok) return;
+                const data = await res.json();
+                const dot = document.getElementById('notificationsBtn')?.querySelector('.badge-dot');
+                if (dot) {
+                    dot.style.display = data.count > 0 ? 'block' : 'none';
+                }
+            } catch (err) {
+                // Ignore silent background check error
+            }
+        },
+        async load() {
+            const list = document.getElementById('notificationList');
+            if (!list) return;
+
+            try {
+                const res = await fetch('/api/notifications');
+                if (!res.ok) return;
+                const items = await res.json();
+
+                if (items.length === 0) {
+                    list.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-tertiary); font-size: 13px;">No notifications yet ✨</div>`;
+                    return;
+                }
+
+                let html = '';
+                items.forEach(n => {
+                    const unreadClass = !n.isRead ? 'unread' : '';
+                    const icon = n.type === 'Warning' ? '⚠️' : n.type === 'Alert' ? '🚨' : n.type === 'Reminder' ? '⏰' : '🔔';
+                    html += `
+                        <a href="${n.actionUrl || '#'}" class="notification-item ${unreadClass}" data-id="${n.id}">
+                            <span class="notification-item-icon">${icon}</span>
+                            <div class="notification-item-content">
+                                <div class="notification-item-title">${n.title}</div>
+                                <div class="notification-item-msg">${n.message || ''}</div>
+                                <div class="notification-item-time">${n.timeAgo}</div>
+                            </div>
+                        </a>
+                    `;
+                });
+                list.innerHTML = html;
+
+                // Handle item clicks to mark as read
+                list.querySelectorAll('.notification-item').forEach(el => {
+                    el.addEventListener('click', async () => {
+                        const id = el.dataset.id;
+                        if (id) {
+                            try {
+                                await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+                            } catch (e) {}
+                        }
+                    });
+                });
+            } catch (err) {
+                list.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--color-danger); font-size: 12px;">Failed to load notifications</div>`;
+            }
+        }
+    };
+
+    // ============================================================
+    // AI ASSISTANT DRAWER
+    // ============================================================
+    const AiAssistant = {
+        init() {
+            const btn = document.getElementById('aiDrawerBtn');
+            const drawer = document.getElementById('aiDrawer');
+            const closeBtn = document.getElementById('closeAiDrawerBtn');
+            const sendBtn = document.getElementById('sendAiBtn');
+            const input = document.getElementById('aiInput');
+            const messages = document.getElementById('aiMessages');
+
+            if (!drawer) return;
+
+            const toggle = () => {
+                drawer.classList.toggle('open');
+                if (drawer.classList.contains('open')) {
+                    setTimeout(() => input?.focus(), 150);
+                }
+            };
+
+            if (btn) btn.addEventListener('click', toggle);
+            if (closeBtn) closeBtn.addEventListener('click', () => drawer.classList.remove('open'));
+
+            // Shortcut: Ctrl+J / Cmd+J
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+                    e.preventDefault();
+                    toggle();
+                }
+            });
+
+            const send = async () => {
+                const text = input?.value?.trim();
+                if (!text || !messages) return;
+
+                // Append user message
+                const userMsg = document.createElement('div');
+                userMsg.className = 'ai-msg ai-msg-user';
+                userMsg.textContent = text;
+                messages.appendChild(userMsg);
+                input.value = '';
+                messages.scrollTop = messages.scrollHeight;
+
+                // Loading indicator
+                const botMsg = document.createElement('div');
+                botMsg.className = 'ai-msg ai-msg-bot';
+                botMsg.textContent = 'Thinking... ✨';
+                messages.appendChild(botMsg);
+                messages.scrollTop = messages.scrollHeight;
+
+                try {
+                    const res = await fetch('/api/ai/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        botMsg.innerHTML = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>');
+                    } else {
+                        botMsg.textContent = "Sorry, I couldn't process that request right now.";
+                    }
+                } catch (err) {
+                    botMsg.textContent = "Connection error. Please try again.";
+                }
+                messages.scrollTop = messages.scrollHeight;
+            };
+
+            if (sendBtn) sendBtn.addEventListener('click', send);
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        send();
+                    }
+                });
+            }
+        }
+    };
+
+    // ============================================================
+    // MODAL MANAGER
+    // ============================================================
+    const ModalManager = {
+        init() {
+            // Close when clicking modal backdrop
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal-backdrop')) {
+                    e.target.classList.remove('active');
+                }
+            });
+
+            // Close when pressing Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal-backdrop.active').forEach(m => m.classList.remove('active'));
+                }
+            });
+        }
+    };
+
+    // ============================================================
     // BADGES UPDATE
     // ============================================================
     const Badges = {
         init() {
             const todayBadge = document.getElementById('todayBadge');
             const inboxBadge = document.getElementById('inboxBadge');
-            // These will be populated from the API later
             if (todayBadge) todayBadge.style.display = 'none';
             if (inboxBadge) inboxBadge.style.display = 'none';
         }
@@ -327,6 +599,9 @@
         Clock.init();
         HabitToggle.init();
         Tabs.init();
+        Notifications.init();
+        AiAssistant.init();
+        ModalManager.init();
         Badges.init();
     });
 })();

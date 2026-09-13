@@ -1,14 +1,146 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.CalendarModel
 @{
     ViewData["Title"] = "Calendar";
+    var userId = UserManager.GetUserId(User);
+    var now = DateTime.UtcNow;
+    var startOfMonth = new DateTime(now.Year, now.Month, 1);
+    var endOfMonth = startOfMonth.AddMonths(1);
+
+    var events = await Db.CalendarEvents.Where(e => e.UserId == userId).OrderBy(e => e.StartTime).ToListAsync();
+    var thisMonthEvents = events.Where(e => e.StartTime >= startOfMonth && e.StartTime < endOfMonth).ToList();
+    var upcomingEvents = events.Where(e => e.StartTime >= now).Take(15).ToList();
+    var tasksDue = await Db.TodoTasks.Where(t => t.UserId == userId && t.DueDate.HasValue && t.Status != TodoTaskStatus.Completed && t.DueDate >= now).OrderBy(t => t.DueDate).Take(10).ToListAsync();
+
+    // Build calendar grid
+    var firstDayOfMonth = (int)startOfMonth.DayOfWeek;
+    var daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
+    var eventsByDay = thisMonthEvents.GroupBy(e => e.StartTime.Day).ToDictionary(g => g.Key, g => g.ToList());
+    var tasksByDay = tasksDue.Where(t => t.DueDate!.Value.Month == now.Month && t.DueDate!.Value.Year == now.Year).GroupBy(t => t.DueDate!.Value.Day).ToDictionary(g => g.Key, g => g.Count());
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">📅 Calendar</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">📅</div>
-        <div class="empty-state-title">Calendar</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📅 Calendar</h1>
+            <p class="section-subtitle">@now.ToString("MMMM yyyy") — Events, deadlines, and schedule</p>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">This Month</span><span class="stat-value">@thisMonthEvents.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Upcoming</span><span class="stat-value">@upcomingEvents.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Tasks Due</span><span class="stat-value">@tasksDue.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Today</span><span class="stat-value">@now.ToString("ddd d")</span></div></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-4);">
+        <!-- CALENDAR GRID -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📆 @now.ToString("MMMM yyyy")</span>
+            </div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; text-align: center;">
+                    @{ var dayNames = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }; }
+                    @foreach (var dayName in dayNames)
+                    {
+                        <div style="padding: var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-tertiary); text-transform: uppercase;">@dayName</div>
+                    }
+
+                    @for (int i = 0; i < firstDayOfMonth; i++)
+                    {
+                        <div style="padding: var(--space-2);"></div>
+                    }
+
+                    @for (int day = 1; day <= daysInMonth; day++)
+                    {
+                        var isToday = day == now.Day;
+                        var hasEvents = eventsByDay.ContainsKey(day);
+                        var hasTasks = tasksByDay.ContainsKey(day);
+                        var dayEventCount = hasEvents ? eventsByDay[day].Count : 0;
+                        var dayTaskCount = hasTasks ? tasksByDay[day] : 0;
+
+                        <div style="padding: var(--space-2); border-radius: var(--radius-md); min-height: 60px; position: relative;
+                            background: @(isToday ? "var(--color-primary-subtle)" : "var(--bg-elevated)");
+                            border: @(isToday ? "1px solid var(--color-primary)" : "1px solid var(--border-secondary)");">
+                            <div style="font-size: var(--text-sm); font-weight: @(isToday ? "var(--weight-bold)" : "var(--weight-medium)"); color: @(isToday ? "var(--color-primary-text)" : "var(--text-primary)"); margin-bottom: 2px;">@day</div>
+                            @if (hasEvents)
+                            {
+                                @foreach (var ev in eventsByDay[day].Take(2))
+                                {
+                                    var color = ev.EventType switch { CalendarEventType.Exam => "#ef4444", CalendarEventType.Assignment => "#f59e0b", CalendarEventType.Class => "#3b82f6", CalendarEventType.Interview => "#22c55e", _ => "#6366f1" };
+                                    <div style="font-size: 9px; padding: 1px 3px; border-radius: 2px; background: @color; color: white; margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">@ev.Title</div>
+                                }
+                                @if (dayEventCount > 2)
+                                {
+                                    <div style="font-size: 9px; color: var(--text-tertiary);">+@(dayEventCount - 2) more</div>
+                                }
+                            }
+                            @if (hasTasks)
+                            {
+                                <div style="font-size: 9px; padding: 1px 3px; border-radius: 2px; background: var(--color-warning); color: black;">@dayTaskCount task(s) due</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+            <!-- UPCOMING EVENTS -->
+            <div class="card">
+                <div class="card-header"><span class="card-title">📋 Upcoming Events</span></div>
+                <div class="card-body">
+                    @if (upcomingEvents.Count == 0)
+                    {
+                        <p class="text-sm text-secondary" style="padding: var(--space-3);">No upcoming events.</p>
+                    }
+                    @foreach (var ev in upcomingEvents.Take(8))
+                    {
+                        var typeIcon = ev.EventType switch { CalendarEventType.Exam => "📝", CalendarEventType.Assignment => "📄", CalendarEventType.Class => "📚", CalendarEventType.Meeting => "👥", CalendarEventType.Interview => "💼", CalendarEventType.StudySession => "📖", _ => "📌" };
+                        var typeClass = ev.EventType switch { CalendarEventType.Exam => "badge-danger", CalendarEventType.Assignment => "badge-warning", CalendarEventType.Class => "badge-info", _ => "badge-neutral" };
+                        <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: var(--text-sm);">@typeIcon @ev.Title</span>
+                                <span class="badge @typeClass" style="font-size: 10px;">@ev.EventType</span>
+                            </div>
+                            <div class="text-xs text-tertiary" style="margin-top: 2px;">@ev.StartTime.ToString("ddd, MMM d · h:mm tt")</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- DEADLINES -->
+            <div class="card">
+                <div class="card-header"><span class="card-title">⏰ Task Deadlines</span></div>
+                <div class="card-body">
+                    @if (tasksDue.Count == 0)
+                    {
+                        <p class="text-sm text-secondary" style="padding: var(--space-3);">No upcoming deadlines. 🎉</p>
+                    }
+                    @foreach (var task in tasksDue.Take(8))
+                    {
+                        var daysLeft = (task.DueDate!.Value - now).Days;
+                        var urgency = daysLeft switch { <= 0 => "badge-danger", <= 2 => "badge-warning", _ => "badge-neutral" };
+                        <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                            <div style="font-size: var(--text-sm);">@task.Title</div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                                <span class="text-xs text-tertiary">@task.DueDate!.Value.ToString("MMM d")</span>
+                                <span class="badge @urgency" style="font-size: 10px;">@(daysLeft <= 0 ? "Overdue!" : $"{daysLeft}d left")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
 </div>

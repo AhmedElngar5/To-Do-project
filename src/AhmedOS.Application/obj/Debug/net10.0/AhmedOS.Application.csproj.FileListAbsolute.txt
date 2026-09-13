@@ -13,3 +13,4 @@ C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Application\obj\Debug\net10.0\A
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Application\obj\Debug\net10.0\refint\AhmedOS.Application.dll
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Application\obj\Debug\net10.0\AhmedOS.Application.pdb
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Application\obj\Debug\net10.0\ref\AhmedOS.Application.dll
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Application\obj\Debug\net10.0\AhmedOS.Application.sourcelink.json

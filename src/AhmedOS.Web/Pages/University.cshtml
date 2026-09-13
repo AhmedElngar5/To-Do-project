@@ -1,14 +1,156 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.UniversityModel
 @{
     ViewData["Title"] = "University";
+    var userId = UserManager.GetUserId(User);
+    var courses = await Db.Courses.Where(c => c.UserId == userId).Include(c => c.Grades).Include(c => c.Tasks.Where(t => !t.IsDeleted)).OrderBy(c => c.Name).ToListAsync();
+    var events = await Db.CalendarEvents.Where(e => e.UserId == userId && e.CourseId != null && e.StartTime >= DateTime.UtcNow).OrderBy(e => e.StartTime).Take(10).ToListAsync();
+    var totalCredits = courses.Sum(c => c.CreditHours ?? 0);
+    var avgProgress = courses.Count > 0 ? (int)courses.Average(c => c.Progress) : 0;
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">🎓 University</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">🎓</div>
-        <div class="empty-state-title">University</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🎓 University</h1>
+            <p class="section-subtitle">Courses, grades, assignments, and academic progress</p>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Courses</span><span class="stat-value">@courses.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Credit Hours</span><span class="stat-value">@totalCredits</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Avg Progress</span><span class="stat-value">@avgProgress%</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Upcoming Events</span><span class="stat-value">@events.Count</span></div></div>
+    </div>
+
+    <div class="widget-grid">
+        <!-- COURSES -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">📚 My Courses</span>
+            </div>
+            <div class="card-body">
+                @if (courses.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">🎓</div>
+                        <div class="empty-state-title">No courses yet</div>
+                        <div class="empty-state-text">Add your university courses to track grades and assignments.</div>
+                    </div>
+                }
+                else
+                {
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4);">
+                        @foreach (var course in courses)
+                        {
+                            var gradeCount = course.Grades.Count;
+                            var avgGrade = gradeCount > 0 ? course.Grades.Where(g => g.Score.HasValue && g.MaxScore.HasValue && g.MaxScore > 0).Select(g => (g.Score!.Value / g.MaxScore!.Value) * 100).DefaultIfEmpty(0).Average() : 0;
+                            var taskCount = course.Tasks.Count(t => t.Status != TodoTaskStatus.Completed);
+                            <div class="card" style="border-left: 3px solid @(course.Color ?? "var(--color-primary)");">
+                                <div class="card-body" style="padding: var(--space-4);">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                                        <div>
+                                            <div style="font-weight: var(--weight-semibold); font-size: var(--text-base);">@course.Name</div>
+                                            @if (!string.IsNullOrEmpty(course.Code))
+                                            {
+                                                <div class="text-xs text-tertiary" style="margin-top: 2px;">@course.Code</div>
+                                            }
+                                        </div>
+                                        <span class="badge badge-neutral">@(course.Semester ?? "—")</span>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(course.Instructor))
+                                    {
+                                        <div class="text-sm text-secondary" style="margin-bottom: var(--space-2);">👨‍🏫 @course.Instructor</div>
+                                    }
+
+                                    <div class="progress-bar" style="margin-bottom: var(--space-2);">
+                                        <div class="progress-bar-fill" style="width: @course.Progress%; background: @(course.Color ?? "var(--color-primary)");"></div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-tertiary);">
+                                        <span>Progress: @course.Progress%</span>
+                                        <span>@(course.CreditHours ?? 0) credits</span>
+                                    </div>
+
+                                    <!-- Grades summary -->
+                                    <div style="display: flex; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-secondary);">
+                                        <div style="flex: 1; text-align: center;">
+                                            <div class="text-xs text-tertiary">Grades</div>
+                                            <div style="font-weight: var(--weight-semibold);">@gradeCount</div>
+                                        </div>
+                                        <div style="flex: 1; text-align: center;">
+                                            <div class="text-xs text-tertiary">Avg</div>
+                                            <div style="font-weight: var(--weight-semibold);">@(gradeCount > 0 ? $"{avgGrade:F0}%" : "—")</div>
+                                        </div>
+                                        <div style="flex: 1; text-align: center;">
+                                            <div class="text-xs text-tertiary">Tasks</div>
+                                            <div style="font-weight: var(--weight-semibold);">@taskCount</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Grades list -->
+                                    @if (gradeCount > 0)
+                                    {
+                                        <div style="margin-top: var(--space-3);">
+                                            @foreach (var grade in course.Grades.OrderByDescending(g => g.Date))
+                                            {
+                                                var pct = grade.MaxScore > 0 ? (grade.Score / grade.MaxScore * 100) : null;
+                                                var color = pct switch { >= 85 => "var(--color-success)", >= 70 => "var(--color-info)", >= 50 => "var(--color-warning)", _ => "var(--color-danger)" };
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-1) 0; font-size: var(--text-sm);">
+                                                    <div>
+                                                        <span style="color: var(--text-secondary);">@grade.Name</span>
+                                                        @if (!string.IsNullOrEmpty(grade.Type))
+                                                        {
+                                                            <span class="badge badge-neutral" style="font-size: 10px; padding: 1px 6px; margin-left: 4px;">@grade.Type</span>
+                                                        }
+                                                    </div>
+                                                    <div style="font-weight: var(--weight-medium); color: @(pct.HasValue ? color : "var(--text-secondary)");">
+                                                        @(grade.Score.HasValue ? $"{grade.Score}/{grade.MaxScore}" : "—")
+                                                        @if (pct.HasValue)
+                                                        {
+                                                            <span style="font-size: var(--text-xs); margin-left: 4px;">(@($"{pct:F0}")%)</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- UPCOMING EVENTS -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">📅 Upcoming</span></div>
+            <div class="card-body">
+                @if (events.Count == 0)
+                {
+                    <p class="text-sm text-secondary" style="padding: var(--space-3);">No upcoming academic events.</p>
+                }
+                @foreach (var ev in events)
+                {
+                    var typeClass = ev.EventType switch { CalendarEventType.Exam => "badge-danger", CalendarEventType.Assignment => "badge-warning", CalendarEventType.Class => "badge-info", _ => "badge-neutral" };
+                    <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: var(--text-sm); font-weight: var(--weight-medium);">@ev.Title</span>
+                            <span class="badge @typeClass">@ev.EventType</span>
+                        </div>
+                        <div class="text-xs text-tertiary" style="margin-top: 2px;">@ev.StartTime.ToString("ddd, MMM d · h:mm tt")</div>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>

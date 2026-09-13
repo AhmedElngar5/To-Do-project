@@ -1,5 +1,6 @@
 @page
 @using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Entities
 @using AhmedOS.Domain.Enums
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
@@ -10,20 +11,24 @@
     ViewData["Title"] = "Tasks";
     var userId = UserManager.GetUserId(User);
     var filter = HttpContext.Request.Query["filter"].FirstOrDefault() ?? "all";
+    var view = HttpContext.Request.Query["view"].FirstOrDefault() ?? "list";
     var today = DateTime.UtcNow.Date;
 
     var query = Db.TodoTasks
         .Where(t => t.UserId == userId)
-        .Include(t => t.Category).Include(t => t.Project);
+        .Include(t => t.Category)
+        .Include(t => t.Project);
+
+    var allTasks = await query.ToListAsync();
 
     var tasks = filter switch
     {
-        "today" => await query.Where(t => t.DueDate != null && t.DueDate.Value.Date == today && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.Priority).ToListAsync(),
-        "overdue" => await query.Where(t => t.DueDate < today && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).OrderBy(t => t.DueDate).ToListAsync(),
-        "high" => await query.Where(t => (t.Priority == Priority.High || t.Priority == Priority.Critical) && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate).ToListAsync(),
-        "completed" => await query.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.CompletedAt).Take(50).ToListAsync(),
-        "inbox" => await query.Where(t => t.Status == TodoTaskStatus.Inbox).OrderByDescending(t => t.CreatedAt).ToListAsync(),
-        _ => await query.Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.Status != TodoTaskStatus.Archived).OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate ?? DateTime.MaxValue).ToListAsync()
+        "today" => allTasks.Where(t => t.DueDate != null && t.DueDate.Value.Date == today && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.PriorityScore ?? (int)t.Priority).ToList(),
+        "overdue" => allTasks.Where(t => t.DueDate != null && t.DueDate.Value.Date < today && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).OrderBy(t => t.DueDate).ToList(),
+        "high" => allTasks.Where(t => (t.Priority == Priority.High || t.Priority == Priority.Critical) && t.Status != TodoTaskStatus.Completed).OrderByDescending(t => t.PriorityScore ?? (int)t.Priority).ToList(),
+        "completed" => allTasks.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.CompletedAt).Take(50).ToList(),
+        "inbox" => allTasks.Where(t => t.Status == TodoTaskStatus.Inbox).OrderByDescending(t => t.CreatedAt).ToList(),
+        _ => allTasks.Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.Status != TodoTaskStatus.Archived).OrderByDescending(t => t.PriorityScore ?? (int)t.Priority * 10).ThenBy(t => t.DueDate ?? DateTime.MaxValue).ToList()
     };
 
     var categories = await Db.Categories.Where(c => c.UserId == userId).OrderBy(c => c.SortOrder).ToListAsync();
@@ -31,64 +36,287 @@
 }
 
 <div class="animate-fade-in">
+    <!-- HEADER -->
     <div class="section-header">
         <div>
-            <h1 class="section-title">✅ Tasks</h1>
-            <p class="section-subtitle">@tasks.Count task@(tasks.Count != 1 ? "s" : "")</p>
+            <h1 class="section-title">✅ Tasks & Execution</h1>
+            <p class="section-subtitle">@tasks.Count @(view == "board" ? "tasks on board" : view == "matrix" ? "tasks in matrix" : "tasks shown")</p>
         </div>
-        <button class="btn btn-primary" onclick="document.getElementById('createTaskModal').classList.add('active')">+ New Task</button>
+        <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+            <!-- VIEW SELECTOR -->
+            <div style="display: flex; background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg); padding: 2px;">
+                <a href="/Tasks?view=list&filter=@filter" class="btn btn-sm @(view == "list" ? "btn-secondary" : "btn-ghost")" title="List View">📋 List</a>
+                <a href="/Tasks?view=board&filter=@filter" class="btn btn-sm @(view == "board" ? "btn-secondary" : "btn-ghost")" title="Kanban Board">📊 Board</a>
+                <a href="/Tasks?view=matrix&filter=@filter" class="btn btn-sm @(view == "matrix" ? "btn-secondary" : "btn-ghost")" title="Eisenhower Matrix">🎯 Matrix</a>
+            </div>
+
+            <!-- RECALCULATE PRIORITIES -->
+            <form method="post" asp-page-handler="RecalculatePriorities" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnView" value="@view" />
+                <button type="submit" class="btn btn-secondary btn-sm" title="Compute smart priority scores for all tasks">⚡ Score</button>
+            </form>
+
+            <button class="btn btn-primary" onclick="document.getElementById('createTaskModal').classList.add('active')">+ New Task</button>
+        </div>
     </div>
 
-    <!-- FILTERS -->
-    <div class="tabs">
-        <a href="/Tasks" class="tab @(filter == "all" ? "active" : "")">All</a>
-        <a href="/Tasks?filter=today" class="tab @(filter == "today" ? "active" : "")">Today</a>
-        <a href="/Tasks?filter=overdue" class="tab @(filter == "overdue" ? "active" : "")">Overdue</a>
-        <a href="/Tasks?filter=high" class="tab @(filter == "high" ? "active" : "")">High Priority</a>
-        <a href="/Tasks?filter=inbox" class="tab @(filter == "inbox" ? "active" : "")">Inbox</a>
-        <a href="/Tasks?filter=completed" class="tab @(filter == "completed" ? "active" : "")">Completed</a>
-    </div>
-
-    <!-- TASK LIST -->
-    @if (tasks.Count == 0)
+    <!-- FILTER TABS (for List view) -->
+    @if (view == "list")
     {
-        <div class="empty-state">
-            <div class="empty-state-icon">@(filter == "completed" ? "🎉" : filter == "overdue" ? "✨" : "📝")</div>
-            <div class="empty-state-title">@(filter switch { "completed" => "No completed tasks yet", "overdue" => "No overdue tasks!", "today" => "Nothing scheduled for today", "inbox" => "Inbox is empty", _ => "No tasks found" })</div>
-            <div class="empty-state-text">@(filter switch { "overdue" => "Great work — you're all caught up.", "inbox" => "Capture a task to get started.", _ => "Create a new task to begin tracking your work." })</div>
+        <div class="tabs" style="margin-bottom: var(--space-4);">
+            <a href="/Tasks?view=list&filter=all" class="tab @(filter == "all" ? "active" : "")">All</a>
+            <a href="/Tasks?view=list&filter=today" class="tab @(filter == "today" ? "active" : "")">Today</a>
+            <a href="/Tasks?view=list&filter=overdue" class="tab @(filter == "overdue" ? "active" : "")">Overdue</a>
+            <a href="/Tasks?view=list&filter=high" class="tab @(filter == "high" ? "active" : "")">High Priority</a>
+            <a href="/Tasks?view=list&filter=inbox" class="tab @(filter == "inbox" ? "active" : "")">Inbox</a>
+            <a href="/Tasks?view=list&filter=completed" class="tab @(filter == "completed" ? "active" : "")">Completed</a>
         </div>
     }
-    else
+
+    <!-- 1. LIST VIEW -->
+    @if (view == "list")
     {
-        <div style="background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg);">
-            @foreach (var task in tasks)
-            {
-                var priorityClass = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", Priority.Medium => "priority-medium", _ => "priority-low" };
-                var isCompleted = task.Status == TodoTaskStatus.Completed;
-                <div class="task-item" style="border-bottom: 1px solid var(--border-secondary);">
-                    <div class="task-checkbox @(isCompleted ? "checked" : priorityClass)" data-task-id="@task.Id"></div>
-                    <div class="task-content">
-                        <div class="task-title @(isCompleted ? "completed" : "")">@task.Title</div>
-                        <div class="task-meta">
-                            @if (task.DueDate != null)
+        @if (tasks.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">@(filter == "completed" ? "🎉" : filter == "overdue" ? "✨" : "📝")</div>
+                <div class="empty-state-title">@(filter switch { "completed" => "No completed tasks yet", "overdue" => "No overdue tasks!", "today" => "Nothing scheduled for today", "inbox" => "Inbox is empty", _ => "No tasks found" })</div>
+                <div class="empty-state-text">@(filter switch { "overdue" => "Great work — you're all caught up.", "inbox" => "Capture a task to get started.", _ => "Create a new task to begin tracking your work." })</div>
+            </div>
+        }
+        else
+        {
+            <div style="background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg);">
+                @foreach (var task in tasks)
+                {
+                    var priorityClass = task.Priority switch { Priority.Critical => "priority-critical", Priority.High => "priority-high", Priority.Medium => "priority-medium", _ => "priority-low" };
+                    var isCompleted = task.Status == TodoTaskStatus.Completed;
+                    <div class="task-item" style="border-bottom: 1px solid var(--border-secondary); display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: var(--space-3); flex: 1; min-width: 0;">
+                            <div class="task-checkbox @(isCompleted ? "checked" : priorityClass)" data-task-id="@task.Id"></div>
+                            <div class="task-content" style="min-width: 0;">
+                                <div class="task-title @(isCompleted ? "completed" : "")">@task.Title</div>
+                                <div class="task-meta" style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                                    @if (task.DueDate != null)
+                                    {
+                                        var d = (task.DueDate.Value.Date - today).Days;
+                                        <span class="task-meta-item @(d < 0 ? "overdue" : d == 0 ? "today" : "")">
+                                            📅 @(d < 0 ? $"{-d}d overdue" : d == 0 ? "Today" : d == 1 ? "Tomorrow" : task.DueDate.Value.ToString("MMM d"))
+                                        </span>
+                                    }
+                                    @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
+                                    @if (task.Project != null) { <span class="task-meta-item">🚀 @task.Project.Name</span> }
+                                    @if (task.EstimatedMinutes != null) { <span class="task-meta-item">⏱️ @task.EstimatedMinutes min</span> }
+                                    <span class="badge @(task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", Priority.Medium => "badge-info", _ => "badge-neutral" })">@task.Priority</span>
+                                    @if (task.Status != TodoTaskStatus.Inbox && task.Status != TodoTaskStatus.Completed)
+                                    {
+                                        <span class="badge badge-neutral">@task.Status</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PRIORITY SCORE -->
+                        <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                            @if (task.PriorityScore.HasValue)
                             {
-                                var d = (task.DueDate.Value.Date - today).Days;
-                                <span class="task-meta-item @(d < 0 ? "overdue" : d == 0 ? "today" : "")">
-                                    📅 @(d < 0 ? $"{-d}d overdue" : d == 0 ? "Today" : d == 1 ? "Tomorrow" : task.DueDate.Value.ToString("MMM d"))
+                                <span class="priority-score-badge" title="@task.PriorityReason">
+                                    ⚡ @task.PriorityScore.Value.ToString("0")
                                 </span>
-                            }
-                            @if (task.Category != null) { <span class="task-meta-item">@task.Category.Icon @task.Category.Name</span> }
-                            @if (task.Project != null) { <span class="task-meta-item">🚀 @task.Project.Name</span> }
-                            @if (task.EstimatedMinutes != null) { <span class="task-meta-item">⏱️ @task.EstimatedMinutes min</span> }
-                            <span class="badge @(task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", Priority.Medium => "badge-info", _ => "badge-neutral" })">@task.Priority</span>
-                            @if (task.Status != TodoTaskStatus.Inbox && task.Status != TodoTaskStatus.Completed)
-                            {
-                                <span class="badge badge-neutral">@task.Status</span>
                             }
                         </div>
                     </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- 2. KANBAN BOARD VIEW -->
+    @if (view == "board")
+    {
+        var cols = new[]
+        {
+            (Status: TodoTaskStatus.Inbox, Title: "📥 Inbox", Color: "#8b5cf6"),
+            (Status: TodoTaskStatus.Planned, Title: "📋 Planned / To Do", Color: "#3b82f6"),
+            (Status: TodoTaskStatus.InProgress, Title: "⚡ In Progress", Color: "#f59e0b"),
+            (Status: TodoTaskStatus.Blocked, Title: "🚫 Blocked", Color: "#ef4444"),
+            (Status: TodoTaskStatus.Completed, Title: "✅ Done", Color: "#10b981")
+        };
+
+        <div class="kanban-board">
+            @foreach (var col in cols)
+            {
+                var colTasks = allTasks.Where(t => t.Status == col.Status).OrderByDescending(t => t.PriorityScore ?? (int)t.Priority).ToList();
+                <div class="kanban-col">
+                    <div class="kanban-col-header" style="border-top: 3px solid @col.Color;">
+                        <span class="kanban-col-title">@col.Title</span>
+                        <span class="kanban-col-count">@colTasks.Count</span>
+                    </div>
+                    <div class="kanban-col-body">
+                        @if (colTasks.Count == 0)
+                        {
+                            <div style="text-align: center; color: var(--text-tertiary); font-size: var(--text-xs); padding: var(--space-4);">No tasks in this stage</div>
+                        }
+                        @foreach (var task in colTasks)
+                        {
+                            <div class="kanban-card">
+                                <div class="kanban-card-title">@task.Title</div>
+                                <div class="kanban-card-meta">
+                                    @if (task.DueDate != null)
+                                    {
+                                        var d = (task.DueDate.Value.Date - today).Days;
+                                        <span style="color: @(d < 0 ? "var(--color-danger)" : d == 0 ? "var(--color-warning)" : "inherit");">
+                                            📅 @(d < 0 ? $"{-d}d overdue" : d == 0 ? "Today" : task.DueDate.Value.ToString("MMM d"))
+                                        </span>
+                                    }
+                                    @if (task.Project != null) { <span>🚀 @task.Project.Name</span> }
+                                    @if (task.PriorityScore.HasValue)
+                                    {
+                                        <span class="priority-score-badge">⚡ @task.PriorityScore.Value.ToString("0")</span>
+                                    }
+                                </div>
+                                <div style="display: flex; gap: 4px; margin-top: var(--space-2); justify-content: flex-end;">
+                                    @if (col.Status != TodoTaskStatus.InProgress && col.Status != TodoTaskStatus.Completed)
+                                    {
+                                        <form method="post" asp-page-handler="MoveTask" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="taskId" value="@task.Id" />
+                                            <input type="hidden" name="newStatus" value="@((int)TodoTaskStatus.InProgress)" />
+                                            <input type="hidden" name="returnView" value="board" />
+                                            <button type="submit" class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 2px 6px;" title="Start">⚡ Start</button>
+                                        </form>
+                                    }
+                                    @if (col.Status != TodoTaskStatus.Completed)
+                                    {
+                                        <form method="post" asp-page-handler="MoveTask" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="taskId" value="@task.Id" />
+                                            <input type="hidden" name="newStatus" value="@((int)TodoTaskStatus.Completed)" />
+                                            <input type="hidden" name="returnView" value="board" />
+                                            <button type="submit" class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 2px 6px; color: var(--color-success);" title="Mark complete">✓ Done</button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
             }
+        </div>
+    }
+
+    <!-- 3. EISENHOWER MATRIX VIEW -->
+    @if (view == "matrix")
+    {
+        var activeOnly = allTasks.Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled).ToList();
+
+        // Q1: Urgent & Important (Due soon/overdue and High/Critical priority)
+        var q1 = activeOnly.Where(t => (t.Priority == Priority.Critical || t.Priority == Priority.High) && t.DueDate.HasValue && (t.DueDate.Value.Date - today).TotalDays <= 2).ToList();
+
+        // Q2: Not Urgent & Important (High/Critical but no immediate due date, OR linked to Goal/Project)
+        var q2 = activeOnly.Where(t => !q1.Contains(t) && (t.Priority == Priority.Critical || t.Priority == Priority.High || t.GoalId.HasValue || t.ProjectId.HasValue)).ToList();
+
+        // Q3: Urgent & Not Important (Due soon but Medium/Low priority)
+        var q3 = activeOnly.Where(t => !q1.Contains(t) && !q2.Contains(t) && t.DueDate.HasValue && (t.DueDate.Value.Date - today).TotalDays <= 2).ToList();
+
+        // Q4: Not Urgent & Not Important (Remaining low priority tasks)
+        var q4 = activeOnly.Where(t => !q1.Contains(t) && !q2.Contains(t) && !q3.Contains(t)).ToList();
+
+        <div class="matrix-grid">
+            <!-- Q1 -->
+            <div class="matrix-quadrant matrix-q1">
+                <div class="matrix-header">
+                    <div>
+                        <div class="matrix-title">🔥 Q1: DO FIRST</div>
+                        <div class="matrix-subtitle">Urgent & Important — Crises, pressing deadlines</div>
+                    </div>
+                    <span class="badge badge-danger">@q1.Count</span>
+                </div>
+                <div class="matrix-tasks">
+                    @if (q1.Count == 0) { <div style="color: var(--text-tertiary); font-size: 12px; padding: 12px 0;">No immediate crises. Great proactive work!</div> }
+                    @foreach (var task in q1)
+                    {
+                        <div class="kanban-card">
+                            <div class="kanban-card-title">@task.Title</div>
+                            <div class="kanban-card-meta">
+                                <span>📅 @(task.DueDate?.ToString("MMM d") ?? "Urgent")</span>
+                                @if (task.PriorityScore.HasValue) { <span class="priority-score-badge">⚡ @task.PriorityScore.Value.ToString("0")</span> }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Q2 -->
+            <div class="matrix-quadrant matrix-q2">
+                <div class="matrix-header">
+                    <div>
+                        <div class="matrix-title">🎯 Q2: SCHEDULE</div>
+                        <div class="matrix-subtitle">Not Urgent & Important — Goals, learning, projects, health</div>
+                    </div>
+                    <span class="badge badge-info">@q2.Count</span>
+                </div>
+                <div class="matrix-tasks">
+                    @if (q2.Count == 0) { <div style="color: var(--text-tertiary); font-size: 12px; padding: 12px 0;">No scheduled strategic tasks.</div> }
+                    @foreach (var task in q2)
+                    {
+                        <div class="kanban-card">
+                            <div class="kanban-card-title">@task.Title</div>
+                            <div class="kanban-card-meta">
+                                @if (task.Project != null) { <span>🚀 @task.Project.Name</span> }
+                                @if (task.PriorityScore.HasValue) { <span class="priority-score-badge">⚡ @task.PriorityScore.Value.ToString("0")</span> }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Q3 -->
+            <div class="matrix-quadrant matrix-q3">
+                <div class="matrix-header">
+                    <div>
+                        <div class="matrix-title">⚡ Q3: DELEGATE / AUTOMATE</div>
+                        <div class="matrix-subtitle">Urgent & Not Important — Interruptions, quick errands</div>
+                    </div>
+                    <span class="badge badge-warning">@q3.Count</span>
+                </div>
+                <div class="matrix-tasks">
+                    @if (q3.Count == 0) { <div style="color: var(--text-tertiary); font-size: 12px; padding: 12px 0;">No interruptive tasks.</div> }
+                    @foreach (var task in q3)
+                    {
+                        <div class="kanban-card">
+                            <div class="kanban-card-title">@task.Title</div>
+                            <div class="kanban-card-meta">
+                                <span>📅 @task.DueDate?.ToString("MMM d")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Q4 -->
+            <div class="matrix-quadrant matrix-q4">
+                <div class="matrix-header">
+                    <div>
+                        <div class="matrix-title">🍃 Q4: ELIMINATE / BACKLOG</div>
+                        <div class="matrix-subtitle">Not Urgent & Not Important — Low value ideas, backlog</div>
+                    </div>
+                    <span class="badge badge-neutral">@q4.Count</span>
+                </div>
+                <div class="matrix-tasks">
+                    @if (q4.Count == 0) { <div style="color: var(--text-tertiary); font-size: 12px; padding: 12px 0;">Backlog is clear.</div> }
+                    @foreach (var task in q4)
+                    {
+                        <div class="kanban-card">
+                            <div class="kanban-card-title">@task.Title</div>
+                            <div class="kanban-card-meta">
+                                <span class="badge badge-neutral">@task.Priority</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -97,28 +325,28 @@
 <div class="modal-backdrop" id="createTaskModal">
     <div class="modal">
         <div class="modal-header">
-            <span class="modal-title">New Task</span>
-            <button class="btn btn-ghost btn-icon" onclick="document.getElementById('createTaskModal').classList.remove('active')">✕</button>
+            <span class="modal-title">Create New Task</span>
+            <button class="modal-close" onclick="document.getElementById('createTaskModal').classList.remove('active')">&times;</button>
         </div>
         <form method="post" asp-page-handler="CreateTask">
             @Html.AntiForgeryToken()
             <div class="modal-body">
                 <div class="form-group">
-                    <label class="form-label">Title *</label>
+                    <label class="form-label">Task Title *</label>
                     <input type="text" name="Title" required placeholder="What needs to be done?" autofocus />
                 </div>
                 <div class="form-group">
                     <label class="form-label">Description</label>
-                    <textarea name="Description" rows="3" placeholder="Add details..."></textarea>
+                    <textarea name="Description" rows="3" placeholder="Add context, links, or notes..."></textarea>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
                     <div class="form-group">
                         <label class="form-label">Priority</label>
                         <select name="Priority">
                             <option value="1">Medium</option>
-                            <option value="3">Critical</option>
-                            <option value="2">High</option>
-                            <option value="0">Low</option>
+                            <option value="3">Critical 🔥</option>
+                            <option value="2">High ⚠️</option>
+                            <option value="0">Low 🍃</option>
                         </select>
                     </div>
                     <div class="form-group">

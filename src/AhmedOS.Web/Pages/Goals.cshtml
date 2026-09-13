@@ -62,10 +62,16 @@
                     <div class="progress-bar mb-4">
                         <div class="progress-bar-fill @(goal.Status == GoalStatus.OnTrack ? "success" : goal.Status == GoalStatus.Behind ? "danger" : "")" style="width: @goal.Progress%"></div>
                     </div>
-                    @if (activeTasks > 0)
-                    {
-                        <span class="text-xs text-secondary">@activeTasks active task@(activeTasks != 1 ? "s" : "")</span>
-                    }
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-secondary);">
+                        <span class="text-xs text-secondary">
+                            @(activeTasks > 0 ? $"{activeTasks} active task{(activeTasks != 1 ? "s" : "")}" : "No linked tasks yet")
+                        </span>
+                        <form method="post" asp-page-handler="DecomposeGoal" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="goalId" value="@goal.Id" />
+                            <button type="submit" class="btn btn-secondary btn-sm" title="AI breaks down this goal into tasks">✨ AI Break Down</button>
+                        </form>
+                    </div>
 
                     @if (goal.SubGoals.Count > 0)
                     {

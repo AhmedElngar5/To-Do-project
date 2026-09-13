@@ -1,14 +1,115 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.DEPIModel
 @{
     ViewData["Title"] = "DEPI";
+    var userId = UserManager.GetUserId(User);
+    var modules = await Db.DEPIModules.Where(m => m.UserId == userId).Include(m => m.Sessions).OrderBy(m => m.SortOrder).ToListAsync();
+    var totalSessions = modules.Sum(m => m.Sessions.Count);
+    var attendedSessions = modules.Sum(m => m.Sessions.Count(s => s.IsAttended));
+    var completedModules = modules.Count(m => m.IsCompleted);
+    var avgProgress = modules.Count > 0 ? (int)modules.Average(m => m.Progress) : 0;
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">📋 DEPI</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">📋</div>
-        <div class="empty-state-title">DEPI</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📋 DEPI Training</h1>
+            <p class="section-subtitle">Digital Egypt Pioneers Initiative — track your modules and sessions</p>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Modules</span><span class="stat-value">@modules.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Completed</span><span class="stat-value">@completedModules</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Avg Progress</span><span class="stat-value">@avgProgress%</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Attendance</span><span class="stat-value">@attendedSessions/@totalSessions</span></div></div>
+    </div>
+
+    <div class="widget-grid">
+        <!-- MODULES -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">📦 Training Modules</span>
+            </div>
+            <div class="card-body">
+                @if (modules.Count == 0)
+                {
+                    <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-title">No DEPI modules yet</div>
+                        <div class="empty-state-text">Add your DEPI training modules to track progress and attendance.</div>
+                    </div>
+                }
+                else
+                {
+                    <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                        @foreach (var mod in modules)
+                        {
+                            var sessionCount = mod.Sessions.Count;
+                            var attended = mod.Sessions.Count(s => s.IsAttended);
+                            var statusBadge = mod.IsCompleted ? "badge-success" : (mod.Progress > 0 ? "badge-primary" : "badge-neutral");
+                            var statusText = mod.IsCompleted ? "Completed" : (mod.Progress > 0 ? "In Progress" : "Not Started");
+                            <div class="card" style="background: var(--bg-elevated);">
+                                <div class="card-body" style="padding: var(--space-4);">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                                        <div>
+                                            <div style="font-weight: var(--weight-semibold); font-size: var(--text-base);">
+                                                @if (mod.IsCompleted) { <span>✅</span> }
+                                                @mod.Name
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(mod.Description))
+                                            {
+                                                <div class="text-sm text-secondary" style="margin-top: 2px;">@mod.Description</div>
+                                            }
+                                        </div>
+                                        <span class="badge @statusBadge">@statusText</span>
+                                    </div>
+
+                                    <div class="progress-bar" style="margin-bottom: var(--space-2);">
+                                        <div class="progress-bar-fill" style="width: @mod.Progress%;"></div>
+                                    </div>
+
+                                    <div style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-3);">
+                                        <span>Progress: @mod.Progress%</span>
+                                        <span>Sessions: @attended/@sessionCount attended</span>
+                                    </div>
+
+                                    @if (mod.StartDate.HasValue || mod.EndDate.HasValue)
+                                    {
+                                        <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2);">
+                                            📅 @(mod.StartDate?.ToString("MMM d") ?? "?") — @(mod.EndDate?.ToString("MMM d") ?? "?")
+                                        </div>
+                                    }
+
+                                    <!-- Sessions list -->
+                                    @if (sessionCount > 0)
+                                    {
+                                        <div style="margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border-secondary);">
+                                            <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2); font-weight: var(--weight-medium);">Sessions:</div>
+                                            @foreach (var session in mod.Sessions.OrderBy(s => s.SessionDate))
+                                            {
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-1) 0; font-size: var(--text-sm);">
+                                                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                                        <span style="color: @(session.IsAttended ? "var(--color-success)" : "var(--color-danger)");">@(session.IsAttended ? "✅" : "❌")</span>
+                                                        <span>@session.Title</span>
+                                                    </div>
+                                                    <span class="text-xs text-tertiary">@(session.SessionDate?.ToString("MMM d") ?? "")</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>

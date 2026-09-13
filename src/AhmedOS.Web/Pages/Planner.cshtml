@@ -1,14 +1,145 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.PlannerModel
 @{
     ViewData["Title"] = "Planner";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var tomorrow = today.AddDays(1);
+    var weekEnd = today.AddDays(7);
+
+    // Today's tasks
+    var todayTasks = await Db.TodoTasks.Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && (t.DueDate.HasValue && t.DueDate.Value.Date == today || t.StartDate.HasValue && t.StartDate.Value.Date == today)).Include(t => t.Category).OrderBy(t => t.Priority).ToListAsync();
+
+    // Tomorrow's tasks
+    var tomorrowTasks = await Db.TodoTasks.Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.DueDate.HasValue && t.DueDate.Value.Date == tomorrow).Include(t => t.Category).OrderBy(t => t.Priority).ToListAsync();
+
+    // This week tasks
+    var weekTasks = await Db.TodoTasks.Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.DueDate.HasValue && t.DueDate.Value.Date > tomorrow && t.DueDate.Value.Date <= weekEnd).Include(t => t.Category).OrderBy(t => t.DueDate).ToListAsync();
+
+    // Overdue
+    var overdueTasks = await Db.TodoTasks.Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && t.DueDate.HasValue && t.DueDate.Value.Date < today).Include(t => t.Category).OrderBy(t => t.DueDate).ToListAsync();
+
+    // Unscheduled high priority
+    var unscheduled = await Db.TodoTasks.Where(t => t.UserId == userId && t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Cancelled && !t.DueDate.HasValue && (t.Priority == Priority.High || t.Priority == Priority.Critical)).Include(t => t.Category).OrderByDescending(t => t.Priority).Take(10).ToListAsync();
+
+    // Today's events
+    var todayEvents = await Db.CalendarEvents.Where(e => e.UserId == userId && e.StartTime.Date == today).OrderBy(e => e.StartTime).ToListAsync();
+
+    // Today's habits
+    var habits = await Db.Habits.Where(h => h.UserId == userId && h.IsActive).ToListAsync();
+    var todayEntries = await Db.HabitEntries.Where(e => e.UserId == userId && e.Date.Date == today).ToListAsync();
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">📋 Planner</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">📋</div>
-        <div class="empty-state-title">Planner</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">📋 Planner</h1>
+            <p class="section-subtitle">@today.ToString("dddd, MMMM d, yyyy") — Plan your day and week</p>
+        </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Today</span><span class="stat-value">@todayTasks.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Tomorrow</span><span class="stat-value">@tomorrowTasks.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">This Week</span><span class="stat-value">@weekTasks.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget" style="@(overdueTasks.Count > 0 ? "color: var(--color-danger);" : "")"><span class="stat-label">Overdue</span><span class="stat-value">@overdueTasks.Count</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Events Today</span><span class="stat-value">@todayEvents.Count</span></div></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+        @{
+            void RenderTaskSection(string title, string icon, List<AhmedOS.Domain.Entities.TodoTask> tasks, string emptyMsg)
+            {
+                <div class="card">
+                    <div class="card-header"><span class="card-title">@icon @title</span></div>
+                    <div class="card-body">
+                        @if (tasks.Count == 0)
+                        {
+                            <p class="text-sm text-secondary" style="padding: var(--space-3);">@emptyMsg</p>
+                        }
+                        @foreach (var task in tasks)
+                        {
+                            var priBadge = task.Priority switch { Priority.Critical => "badge-danger", Priority.High => "badge-warning", Priority.Medium => "badge-info", _ => "badge-neutral" };
+                            <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary); display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-size: var(--text-sm); font-weight: var(--weight-medium);">@task.Title</div>
+                                    <div class="text-xs text-tertiary" style="margin-top: 1px;">
+                                        @(task.Category?.Name ?? "")
+                                        @if (task.EstimatedMinutes.HasValue) { <span>· ~@task.EstimatedMinutes min</span> }
+                                        @if (task.DueDate.HasValue) { <span>· @task.DueDate.Value.ToString("MMM d")</span> }
+                                    </div>
+                                </div>
+                                <span class="badge @priBadge">@task.Priority</span>
+                            </div>
+                        }
+                    </div>
+                </div>;
+            }
+        }
+
+        @{ RenderTaskSection("Today's Plan", "📌", todayTasks, "No tasks scheduled for today."); }
+        @{ RenderTaskSection("Tomorrow", "📅", tomorrowTasks, "Nothing planned for tomorrow yet."); }
+
+        @if (overdueTasks.Count > 0)
+        {
+            RenderTaskSection("⚠️ Overdue", "🚨", overdueTasks, "");
+        }
+
+        @{ RenderTaskSection("This Week", "📆", weekTasks, "No tasks for the rest of the week."); }
+
+        <!-- TODAY'S SCHEDULE -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🕐 Today's Schedule</span></div>
+            <div class="card-body">
+                @if (todayEvents.Count == 0)
+                {
+                    <p class="text-sm text-secondary" style="padding: var(--space-3);">No events scheduled for today.</p>
+                }
+                @foreach (var ev in todayEvents)
+                {
+                    <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary); display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="font-size: var(--text-xs); color: var(--text-tertiary); min-width: 60px; font-weight: var(--weight-medium);">@ev.StartTime.ToString("h:mm tt")</div>
+                        <div>
+                            <div style="font-size: var(--text-sm); font-weight: var(--weight-medium);">@ev.Title</div>
+                            @if (!string.IsNullOrEmpty(ev.Location))
+                            {
+                                <div class="text-xs text-tertiary">📍 @ev.Location</div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- UNSCHEDULED PRIORITIES -->
+        @if (unscheduled.Count > 0)
+        {
+            RenderTaskSection("Unscheduled Priorities", "⚡", unscheduled, "");
+        }
+
+        <!-- TODAY'S HABITS -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🔄 Today's Habits</span></div>
+            <div class="card-body">
+                @foreach (var habit in habits)
+                {
+                    var done = todayEntries.Any(e => e.HabitId == habit.Id && e.IsCompleted);
+                    <div style="padding: var(--space-2) 0; display: flex; align-items: center; gap: var(--space-3); border-bottom: 1px solid var(--border-secondary);">
+                        <span style="font-size: 18px; opacity: @(done ? "1" : "0.3");">@(done ? "✅" : "⬜")</span>
+                        <div>
+                            <span style="font-size: var(--text-sm); font-weight: var(--weight-medium); text-decoration: @(done ? "line-through" : "none"); opacity: @(done ? "0.6" : "1");">@habit.Icon @habit.Name</span>
+                            <span class="text-xs text-tertiary" style="margin-left: var(--space-2);">🔥 @habit.CurrentStreak</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>

@@ -9,3 +9,4 @@ C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Domain\obj\Debug\net10.0\AhmedO
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Domain\obj\Debug\net10.0\refint\AhmedOS.Domain.dll
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Domain\obj\Debug\net10.0\AhmedOS.Domain.pdb
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Domain\obj\Debug\net10.0\ref\AhmedOS.Domain.dll
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Domain\obj\Debug\net10.0\AhmedOS.Domain.sourcelink.json

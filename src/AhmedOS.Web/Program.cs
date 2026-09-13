@@ -36,7 +36,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 // Services
-builder.Services.AddSingleton<IAiService, LocalAiService>();
+builder.Services.AddScoped<IAiService, LocalAiService>();
+builder.Services.AddScoped<IPriorityEngine, PriorityEngine>();
 
 // Razor Pages + Controllers (for API endpoints)
 builder.Services.AddRazorPages();

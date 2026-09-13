@@ -1,14 +1,170 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Enums
+@using AhmedOS.Domain.Entities
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.SettingsModel
 @{
     ViewData["Title"] = "Settings";
+    var userId = UserManager.GetUserId(User);
+    var user = await UserManager.FindByIdAsync(userId!);
+    var settings = await Db.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId) ?? new UserSettings();
+    var categoryCount = await Db.Categories.CountAsync(c => c.UserId == userId);
+    var tagCount = await Db.Tags.CountAsync(t => t.UserId == userId);
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">⚙️ Settings</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">⚙️</div>
-        <div class="empty-state-title">Settings</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">⚙️ Settings</h1>
+            <p class="section-subtitle">Customize your Ahmed OS experience</p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: var(--space-4);">
+        <!-- PROFILE -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">👤 Profile</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-4);">
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-info)); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: var(--weight-bold); color: white;">
+                        @(user?.FullName?[0] ?? 'A')
+                    </div>
+                    <div>
+                        <div style="font-weight: var(--weight-semibold); font-size: var(--text-lg);">@(user?.FullName ?? "Ahmed")</div>
+                        <div class="text-sm text-secondary">@(user?.Email ?? "")</div>
+                        <div class="text-xs text-tertiary" style="margin-top: 2px;">Member since @(user?.CreatedAt.ToString("MMM yyyy") ?? "—")</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); text-align: center;">
+                        <div class="text-xs text-tertiary">Categories</div>
+                        <div style="font-weight: var(--weight-semibold); font-size: var(--text-lg);">@categoryCount</div>
+                    </div>
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); text-align: center;">
+                        <div class="text-xs text-tertiary">Tags</div>
+                        <div style="font-weight: var(--weight-semibold); font-size: var(--text-lg);">@tagCount</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WORK PREFERENCES -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🕐 Work Preferences</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Work Start Time</span>
+                        <span style="font-weight: var(--weight-medium);">@(settings.WorkStartTime ?? "09:00")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Work End Time</span>
+                        <span style="font-weight: var(--weight-medium);">@(settings.WorkEndTime ?? "17:00")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Max Deep Work (hours)</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.MaxDeepWorkHours</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Max Study (hours)</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.MaxStudyHours</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Default Task Duration</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.DefaultTaskDurationMinutes min</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0;">
+                        <span class="text-sm">Break Duration</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.DefaultBreakMinutes min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- APPEARANCE -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🎨 Appearance</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Theme</span>
+                        <span class="badge badge-primary">@settings.Theme</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Language</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.Language</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Timezone</span>
+                        <span style="font-weight: var(--weight-medium);">@settings.Timezone</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0;">
+                        <span class="text-sm">Week Starts On</span>
+                        <span style="font-weight: var(--weight-medium);">@(settings.WeekStartDay == 0 ? "Sunday" : "Monday")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ENERGY & FOCUS -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">⚡ Energy & Focus</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Preferred Deep Work Time</span>
+                        <span class="badge badge-info">@settings.PreferredDeepWorkTime</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-secondary);">
+                        <span class="text-sm">Preferred Study Time</span>
+                        <span class="badge badge-info">@settings.PreferredStudyTime</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) 0;">
+                        <span class="text-sm">Notifications</span>
+                        <span class="badge @(settings.NotificationsEnabled ? "badge-success" : "badge-neutral")">@(settings.NotificationsEnabled ? "Enabled" : "Disabled")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI STATUS -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">🤖 AI Assistant</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md);">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 20px;">🤖</div>
+                    <div>
+                        <div style="font-weight: var(--weight-medium);">AI Not Configured</div>
+                        <div class="text-xs text-secondary">Add an API key to enable AI features like daily briefings, task decomposition, and the AI assistant.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DATA -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">💾 Data</span></div>
+            <div class="card-body" style="padding: var(--space-4);">
+                <div class="text-sm text-secondary" style="margin-bottom: var(--space-3);">Manage your data and account.</div>
+                <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+                        <span class="text-sm">Database</span>
+                        <span class="badge badge-success">SQL Server LocalDB</span>
+                    </div>
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+                        <span class="text-sm">Export Data</span>
+                        <span class="text-xs text-tertiary">Coming soon</span>
+                    </div>
+                    <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+                        <span class="text-sm">Import Data</span>
+                        <span class="text-xs text-tertiary">Coming soon</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

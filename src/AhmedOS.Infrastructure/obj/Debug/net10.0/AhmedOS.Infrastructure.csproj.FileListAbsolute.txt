@@ -17,3 +17,4 @@ C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Infrastructure\obj\Debug\net10.
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Infrastructure\obj\Debug\net10.0\AhmedOS.Infrastructure.pdb
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Infrastructure\obj\Debug\net10.0\AhmedOS.Infrastructure.genruntimeconfig.cache
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Infrastructure\obj\Debug\net10.0\ref\AhmedOS.Infrastructure.dll
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Infrastructure\obj\Debug\net10.0\AhmedOS.Infrastructure.sourcelink.json

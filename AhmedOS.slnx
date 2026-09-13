@@ -5,4 +5,7 @@
     <Project Path="src/AhmedOS.Infrastructure/AhmedOS.Infrastructure.csproj" />
     <Project Path="src/AhmedOS.Web/AhmedOS.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AhmedOS.Tests/AhmedOS.Tests.csproj" />
+  </Folder>
 </Solution>

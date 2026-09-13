@@ -1,14 +1,142 @@
-﻿@page
+@page
+@using AhmedOS.Infrastructure.Data
+@using AhmedOS.Domain.Entities
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject AhmedOSDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 @model AhmedOS.Web.Pages.ReviewsModel
 @{
     ViewData["Title"] = "Reviews";
+    var userId = UserManager.GetUserId(User);
+    var today = DateTime.UtcNow.Date;
+    var reviews = await Db.DailyReviews.Where(r => r.UserId == userId).OrderByDescending(r => r.Date).Take(30).ToListAsync();
+    var todayReview = reviews.FirstOrDefault(r => r.Date.Date == today);
+
+    // Weekly stats
+    var weekStart = today.AddDays(-(int)today.DayOfWeek);
+    var weekTasks = await Db.TodoTasks.Where(t => t.UserId == userId && t.CompletedAt != null && t.CompletedAt >= weekStart).CountAsync();
+    var weekFocus = await Db.FocusSessions.Where(f => f.UserId == userId && f.IsCompleted && f.StartTime >= weekStart).SumAsync(f => f.ActualMinutes ?? 0);
+    var weekHabits = await Db.HabitEntries.Where(h => h.UserId == userId && h.IsCompleted && h.Date >= weekStart).CountAsync();
+    var avgMood = reviews.Where(r => r.MoodRating.HasValue).Take(7).Select(r => r.MoodRating!.Value).DefaultIfEmpty(0).Average();
+    var avgProductivity = reviews.Where(r => r.ProductivityRating.HasValue).Take(7).Select(r => r.ProductivityRating!.Value).DefaultIfEmpty(0).Average();
 }
 
 <div class="animate-fade-in">
-    <div class="section-header"><div><h1 class="section-title">🔍 Reviews</h1><p class="section-subtitle">Coming soon</p></div></div>
-    <div class="empty-state">
-        <div class="empty-state-icon">🔍</div>
-        <div class="empty-state-title">Reviews</div>
-        <div class="empty-state-text">This section is being built. Check back soon.</div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">🔍 Reviews</h1>
+            <p class="section-subtitle">Reflect on your progress — daily and weekly reviews</p>
+        </div>
+    </div>
+
+    <!-- WEEKLY SNAPSHOT -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Tasks Done (Week)</span><span class="stat-value">@weekTasks</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Focus (min)</span><span class="stat-value">@weekFocus</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Habits (Week)</span><span class="stat-value">@weekHabits</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Avg Mood</span><span class="stat-value">@(avgMood > 0 ? $"{avgMood:F1}/5" : "—")</span></div></div>
+        <div class="card card-compact"><div class="card-body stat-widget"><span class="stat-label">Avg Productivity</span><span class="stat-value">@(avgProductivity > 0 ? $"{avgProductivity:F1}/5" : "—")</span></div></div>
+    </div>
+
+    <div class="widget-grid">
+        <!-- TODAY'S REVIEW -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">📝 Today's Review — @today.ToString("dddd, MMMM d")</span>
+            </div>
+            <div class="card-body" style="padding: var(--space-4);">
+                @if (todayReview == null)
+                {
+                    <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
+                        <div class="empty-state-icon">📝</div>
+                        <div class="empty-state-title">No review for today yet</div>
+                        <div class="empty-state-text">Take a moment at the end of the day to reflect on what you accomplished, what challenged you, and what you'll do tomorrow.</div>
+                    </div>
+                }
+                else
+                {
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                        @if (!string.IsNullOrEmpty(todayReview.Accomplishments))
+                        {
+                            <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border-left: 3px solid var(--color-success);">
+                                <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2); font-weight: var(--weight-semibold);">✅ Accomplishments</div>
+                                <div class="text-sm">@todayReview.Accomplishments</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(todayReview.Challenges))
+                        {
+                            <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border-left: 3px solid var(--color-warning);">
+                                <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2); font-weight: var(--weight-semibold);">⚠️ Challenges</div>
+                                <div class="text-sm">@todayReview.Challenges</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(todayReview.TomorrowPlan))
+                        {
+                            <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border-left: 3px solid var(--color-info);">
+                                <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2); font-weight: var(--weight-semibold);">📋 Tomorrow's Plan</div>
+                                <div class="text-sm">@todayReview.TomorrowPlan</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(todayReview.Notes))
+                        {
+                            <div style="padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); border-left: 3px solid var(--color-primary);">
+                                <div class="text-xs text-tertiary" style="margin-bottom: var(--space-2); font-weight: var(--weight-semibold);">📌 Notes</div>
+                                <div class="text-sm">@todayReview.Notes</div>
+                            </div>
+                        }
+                    </div>
+                    <div style="display: flex; gap: var(--space-4); margin-top: var(--space-4);">
+                        @if (todayReview.MoodRating.HasValue)
+                        {
+                            var moodEmoji = todayReview.MoodRating switch { 5 => "😊", 4 => "🙂", 3 => "😐", 2 => "😟", _ => "😢" };
+                            <div><span class="text-xs text-tertiary">Mood:</span> <span style="font-size: var(--text-lg);">@moodEmoji @todayReview.MoodRating/5</span></div>
+                        }
+                        @if (todayReview.ProductivityRating.HasValue)
+                        {
+                            <div><span class="text-xs text-tertiary">Productivity:</span> <span style="font-weight: var(--weight-semibold);">@todayReview.ProductivityRating/5</span></div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- PAST REVIEWS -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header"><span class="card-title">📆 Past Reviews</span></div>
+            <div class="card-body">
+                @if (reviews.Count == 0)
+                {
+                    <p class="text-sm text-secondary" style="padding: var(--space-3);">No past reviews yet. Start your first daily review today!</p>
+                }
+                else
+                {
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Date</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Mood</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Productivity</th>
+                                    <th style="text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-secondary);">Accomplishments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var review in reviews)
+                                {
+                                    var moodEmoji = review.MoodRating switch { 5 => "😊", 4 => "🙂", 3 => "😐", 2 => "😟", 1 => "😢", _ => "—" };
+                                    <tr style="border-top: 1px solid var(--border-secondary);">
+                                        <td style="padding: var(--space-2) var(--space-3); font-weight: var(--weight-medium);">@review.Date.ToString("ddd, MMM d")</td>
+                                        <td style="padding: var(--space-2) var(--space-3);">@moodEmoji</td>
+                                        <td style="padding: var(--space-2) var(--space-3);">@(review.ProductivityRating.HasValue ? $"{review.ProductivityRating}/5" : "—")</td>
+                                        <td style="padding: var(--space-2) var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@(review.Accomplishments ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>

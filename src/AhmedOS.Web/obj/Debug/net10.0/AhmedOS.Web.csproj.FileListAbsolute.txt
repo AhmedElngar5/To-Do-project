@@ -225,9 +225,7 @@ C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compresse
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\nezrqnk58p-{0}-muycvpuwrr-muycvpuwrr.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\v0zgfp0y55-{0}-87fc7y1x7t-87fc7y1x7t.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\yfc7ypekbg-{0}-mlv21k5csn-mlv21k5csn.gz
-C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\i23jgz5ks7-{0}-ivp0odv1n3-ivp0odv1n3.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\e7u0dl5hsh-{0}-61n19gt1b8-61n19gt1b8.gz
-C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\c8pt8cqps9-{0}-6gsi7aigb6-6gsi7aigb6.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\3n71u2lnsf-{0}-bqjiyaj88i-bqjiyaj88i.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\tcugswt3oj-{0}-c2jlpeoesf-c2jlpeoesf.gz
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\220q7nn15j-{0}-erw9l3u2r3-erw9l3u2r3.gz
@@ -300,3 +298,6 @@ C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\refint\Ah
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\AhmedOS.Web.pdb
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\AhmedOS.Web.genruntimeconfig.cache
 C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\ref\AhmedOS.Web.dll
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\AhmedOS.Web.sourcelink.json
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\i23jgz5ks7-{0}-wm6krgaw96-wm6krgaw96.gz
+C:\Users\ahmed\Desktop\To Do project\src\AhmedOS.Web\obj\Debug\net10.0\compressed\c8pt8cqps9-{0}-lflbf6upda-lflbf6upda.gz
